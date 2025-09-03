@@ -5,6 +5,7 @@
 #include "circa/core/field_store.hpp"
 #include "circa/core/grid.hpp"
 #include "circa/core/system.hpp"
+#include "circa/io/log.hpp"
 #include "circa/io/plain.hpp"
 #include "circa/integrators/registry.hpp"
 #include "circa/ops/fd_ops.hpp"
@@ -17,20 +18,24 @@
 using namespace circa;
 
 int main() {
+    circa::log::init();
+
     std::array<int, DIM> grid_cells;
     grid_cells.fill(128);
     std::array<double, DIM> grid_size;
     grid_size.fill(256.0);
 
-    Grid<DIM> g(grid_cells, grid_size);
-    FieldStore<DIM> S(g);
-    FieldStore<DIM> scratch(g); // used later as a placeholder
+    Grid<DIM> grid(grid_cells, grid_size);
+    FieldStore<DIM> S(grid);
+    FieldStore<DIM> scratch(grid); // used later as a placeholder
 
-    for (auto n : {"phi", "c"}) S.ensure(n);
+    for(auto n : {"phi", "c"}) {
+        S.ensure(n);
+    }
 
     std::mt19937 rng(42);
     std::normal_distribution<double> nphi(0.0, 0.05);
-    for (int i = 0; i < g.size; ++i) {
+    for(int i = 0; i < grid.size; ++i) {
         S.map["phi"].a[i] = nphi(rng);
         S.map["c"].a[i] = 0.0;
     }
@@ -51,12 +56,16 @@ int main() {
     auto registry = make_integrator_registry<DIM>();
     auto it = registry.find(cfg.integrator);
     if(it == registry.end()) {
-        throw std::runtime_error("Unknown integrator");
+        CIRCA_CRITICAL("Unknown integrator");
+        exit(0);
     }
     auto stepper = it->second(cfg, build_system, S);
 
     double dt = 0.01, t = 0.0;
-    int steps = 1000000, out_every = 10000, conf_every = 10000;
+    int steps = 1000, out_every = 10000, conf_every = 10000;
+
+    circa::io::dump_all_fields_plain<DIM>(S, "init", 0, 0.0, false);
+
     for(int s = 0; s <= steps; s++) {
         if(s % out_every == 0) {
             const auto& phi = S.get("phi");
@@ -66,16 +75,14 @@ int main() {
             scratch.zero();
             auto sys_now = build_system(S, scratch);
             double FE = circa::Diagnostics<DIM>::total_free_energy(sys_now);
-            std::cout << t << " " << FE << " " << m_avg << " " << t << "\n";
+            std::cout << t << " " << FE << " " << m_avg << " " << s << "\n";
         }
         if(s % conf_every == 0) {
-            if(DIM < 3) {
-                circa::io::dump_all_fields_plain<DIM>(S, "last", s, t, false);
-            }
+            circa::io::dump_all_fields_plain<DIM>(S, "last", s, t, false);
         }
         stepper->step(S, dt);
         t += dt;
     }
-    std::cout << "Done. Final mean(phi)=" << mean<DIM>(S.get("phi")) << "\n";
+    CIRCA_INFO("END OF SIMULATION");
     return 0;
 }

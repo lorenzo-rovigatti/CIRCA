@@ -22,10 +22,15 @@ inline void write_plain_scalar(const Field<D>& f,
                                const std::string& filename,
                                int step, double t,
                                bool append = false) {
+    if(DIM > 2) {
+        return;
+    }
+
     std::ofstream os(filename, append ? (std::ios::out | std::ios::app)
                                       : (std::ios::out | std::ios::trunc));
     if(!os) {
-        throw std::runtime_error("Cannot open " + filename + " for writing");
+        CIRCA_CRITICAL("Cannot open {} for writing", filename);
+        exit(1);
     }
 
     const int nx = f.g.n[0];
@@ -72,6 +77,10 @@ inline void dump_all_fields_plain(const FieldStore<D>& S,
                                   const std::string& prefix,
                                   int step, double t,
                                   bool append = false) {
+    if(DIM > 2) {
+        return;
+    }
+
     for(const auto& kv : S.map) {
         const std::string& name = kv.first;
         const auto& f = kv.second;

@@ -32,7 +32,10 @@ inline void write_vtk_scalar(const Field<D>& f, const std::string& filename, con
     const double sz = detail::dx_or_one(f.g.dx, 2);
 
     std::ofstream os(filename);
-    if (!os) throw std::runtime_error("Cannot open " + filename + " for writing");
+    if(!os) {
+        CIRCA_CRITICAL("Cannot open {} for writing", filename);
+        exit(1);
+    }
 
     os << "# vtk DataFile Version 3.0\n";
     os << "CIRCA scalar output\n";
