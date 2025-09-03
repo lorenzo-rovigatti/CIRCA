@@ -13,7 +13,10 @@ struct Diagnostics {
         }
         return sum * f.g.dV;
     }
-    static double mean_value(const Field<D>& f) { return mean(f); }  // already had this
+    
+    static double mean_value(const Field<D>& f) { 
+        return mean(f); 
+    }
 
     // ask each term that implements IEnergy<D>
     static double total_free_energy(const System<D>& sys) {

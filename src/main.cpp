@@ -5,6 +5,7 @@
 #include "circa/core/field_store.hpp"
 #include "circa/core/grid.hpp"
 #include "circa/core/system.hpp"
+#include "circa/io/plain.hpp"
 #include "circa/integrators/registry.hpp"
 #include "circa/ops/fd_ops.hpp"
 #include "circa/physics/fe_ac_linear.hpp"
@@ -40,13 +41,12 @@ int main() {
         System<DIM> sys;
         sys.add(std::make_unique<CHTerm<DIM, FE_CH_Landau, MobConst<DIM>, FDOps<DIM>>>(
             Sin, dS, fd, "phi", FE_CH_Landau{0.8, 1.0}, MobConst<DIM>{1.0}));
-        sys.add(std::make_unique<ACTerm<DIM, FE_AC_Linear, FDOps<DIM>>>(
-            Sin, dS, fd, "c", "phi", FE_AC_Linear{0.1, 1.0}));
+        // sys.add(std::make_unique<ACTerm<DIM, FE_AC_Linear, FDOps<DIM>>>(Sin, dS, fd, "c", "phi", FE_AC_Linear{0.1, 1.0}));
         return sys;
     };
 
     ParsedInput cfg;
-    cfg.integrator = "rk2";
+    cfg.integrator = "euler";
     cfg.mass_fix = false;
     auto registry = make_integrator_registry<DIM>();
     auto it = registry.find(cfg.integrator);
@@ -55,8 +55,8 @@ int main() {
     }
     auto stepper = it->second(cfg, build_system, S);
 
-    double dt = 2.5e-3, t = 0.0;
-    int steps = 1000, out_every = 200;
+    double dt = 0.01, t = 0.0;
+    int steps = 1000000, out_every = 10000, conf_every = 10000;
     for(int s = 0; s <= steps; s++) {
         if(s % out_every == 0) {
             const auto& phi = S.get("phi");
@@ -66,7 +66,12 @@ int main() {
             scratch.zero();
             auto sys_now = build_system(S, scratch);
             double FE = circa::Diagnostics<DIM>::total_free_energy(sys_now);
-            std::cout << t * dt << " " << FE << " " << m_avg << " " << t << "\n";
+            std::cout << t << " " << FE << " " << m_avg << " " << t << "\n";
+        }
+        if(s % conf_every == 0) {
+            if(DIM < 3) {
+                circa::io::dump_all_fields_plain<DIM>(S, "last", s, t, false);
+            }
         }
         stepper->step(S, dt);
         t += dt;
