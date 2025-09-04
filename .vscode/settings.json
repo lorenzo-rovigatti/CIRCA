@@ -60,6 +60,7 @@
         "semaphore": "cpp",
         "__nullptr": "cpp",
         "expected": "cpp",
-        "__node_handle": "cpp"
+        "__node_handle": "cpp",
+        "cassert": "cpp"
     }
 }
