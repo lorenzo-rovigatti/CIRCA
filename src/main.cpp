@@ -35,11 +35,21 @@ int main(int argc, char *argv[]) {
         FieldStore<DIM> S(grid);
         FieldStore<DIM> scratch(grid); // used later as a placeholder
 
+        for(uint32_t i = 0; i < config.fields.names.size(); i++) {
+            auto name = config.fields.names[i];
+            S.ensure(name);
+            auto strat = config.fields.init_strategies[i];
+            switch(strat.strategy) {
+                case strat.CONSTANT:
+                    S.map[name].fill(strat.average);
+                    break;
+            }
+        }
         for(const auto &n : config.fields.names) {
             S.ensure(n);
         }
 
-        std::mt19937 rng(42);
+        std::mt19937 rng(config.seed);
         std::normal_distribution<double> nphi(0.0, 0.05);
         for(int i = 0; i < grid.size; ++i) {
             S.map["phi"].a[i] = nphi(rng);
@@ -78,7 +88,9 @@ int main(int argc, char *argv[]) {
         CIRCA_INFO("END OF SIMULATION");
     }
     catch (const std::runtime_error &e) {
-        CIRCA_CRITICAL(e.what());
+        if(std::string(e.what()).length() > 0) {
+            CIRCA_CRITICAL(e.what());
+        }
         exit(1);
     }
     return 0;

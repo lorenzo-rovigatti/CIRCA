@@ -30,7 +30,7 @@ inline void write_plain_scalar(const Field<D>& f,
                                       : (std::ios::out | std::ios::trunc));
     if(!os) {
         CIRCA_CRITICAL("Cannot open {} for writing", filename);
-        exit(1);
+        throw std::runtime_error("");
     }
 
     const int nx = f.g.n[0];

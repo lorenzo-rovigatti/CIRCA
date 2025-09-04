@@ -46,7 +46,10 @@ template <int D>
 inline std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
     std::vector<TermSpec<D>> specs;
     auto terms = root["terms"].as_array();
-    if(!terms) throw std::runtime_error("[[terms]] missing or not an array");
+    if(!terms) {
+        CIRCA_CRITICAL("[[terms]] missing or not an array");
+        throw std::runtime_error("");
+    }
 
     for(auto& node : *terms) {
         auto t = node.as_table();
@@ -191,6 +194,8 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
         throw std::runtime_error(fmt::format("Parsing failed with error '{}'", config.raw_table.error().description()));
 	}
 
+    config.seed = value_or<uint64_t>(config.raw_table, "seed", std::time(NULL));
+
     // grid
     auto gsec = config.raw_table["grid"];
     if(!gsec) {
@@ -229,15 +234,40 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
     }
 
     // fields
-    if(auto fsec = config.raw_table["fields"]) {
-        if(auto names = fsec["names"].as_array()) {
-            config.fields.names.clear();
-            for(auto& v : *names) {
-                if(auto s = v.template value<std::string>()) {
-                    config.fields.names.push_back(*s);
-                }
-            }
+    auto fields = config.raw_table["fields"].as_array();
+    if(!fields) {
+        CIRCA_CRITICAL("[[fields]] missing or not an array");
+        throw std::runtime_error("");
+    }
+
+    for(auto& node : *fields) {
+        auto t = node.as_table();
+        if(!t) {
+            continue;
         }
+        std::string name = *value_or_die<std::string>(*t, "name");
+        std::string init_opt = *value_or_die<std::string>(*t, "initialisation");
+        FieldInitialisation init_strat;
+        if(init_opt == "constant") {
+            init_strat.strategy = init_strat.CONSTANT;
+            init_strat.average = *value_or_die<double>(*t, "average");
+        }
+        else if(init_opt == "random") {
+            init_strat.strategy = init_strat.RANDOM;
+            init_strat.average = *value_or_die<double>(*t, "average");
+            init_strat.random_amplitude = *value_or_die<double>(*t, "random_amplitude");
+        }
+        else if(init_opt == "from_file") {
+            init_strat.strategy = init_strat.READ_FROM_FILE;
+            init_strat.filename = *value_or_die<std::string>(*t, "filename");
+        }
+        else {
+            CIRCA_CRITICAL("Field '{}', the specified initialisation strategy '{}' is invalid", name, init_opt);
+            throw std::runtime_error("");
+        }
+
+        config.fields.names.push_back(name);
+        config.fields.init_strategies.push_back(init_strat);
     }
 
     auto specs = parse_term_specs<D>(config.raw_table);

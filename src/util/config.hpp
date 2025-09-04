@@ -34,14 +34,29 @@ struct IntegratorCfg {
     std::string name = "euler";
 };
 
+struct FieldInitialisation {
+    enum Strategy {
+        READ_FROM_FILE,
+        RANDOM,
+        CONSTANT
+    };
+    Strategy strategy;
+
+    std::string filename;
+    double average;
+    double random_amplitude;
+};
+
 struct FieldsCfg {
     std::vector<std::string> names;
+    std::vector<FieldInitialisation> init_strategies;
 };
 
 template <int D>
 struct GeneralConfig {
     toml::parse_result raw_table;
 
+    uint64_t seed;
     GridCfg<D> grid{};
     TimeCfg time{};
     OutputCfg out{};

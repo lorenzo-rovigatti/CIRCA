@@ -36,7 +36,8 @@ std::optional<T> value_or_die(const toml::table& tbl, std::string_view key_path)
     toml::node_view<const toml::node> nv = tbl.at_path(key_path);
 
     if (!nv) {
-        throw std::runtime_error(fmt::format("Missing key '{}'", key_path));
+        CIRCA_CRITICAL(fmt::format("Missing key '{}'", key_path));
+        throw std::runtime_error("");
     }
 
     // Try to extract as T (like node.value<T>())
@@ -44,7 +45,8 @@ std::optional<T> value_or_die(const toml::table& tbl, std::string_view key_path)
         return *v;
     }
 
-    throw std::runtime_error(fmt::format("Key '{}' has incompatible type (expected something convertible to {})", key_path, typeid(T).name()));
+    CIRCA_CRITICAL(fmt::format("Key '{}' has incompatible type (expected something convertible to {})", key_path, typeid(T).name()));
+    throw std::runtime_error("");
 
     return std::nullopt;
 }

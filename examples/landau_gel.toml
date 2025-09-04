@@ -16,13 +16,13 @@ conf_every   = 1000
 name       = "euler"
 
 # optional: list of fields to allocate at start; terms can create them too
-[fields]
-names = ["phi", "c"]
+[[fields]]
+name = "phi"
+
+[[fields]]
+name = "c"
 
 # ===== Terms =====
-# Array-of-tables: each entry is ONE term instance.
-# You can have many CH/AC/etc. terms, with different FE/mobility/options.
-
 [[terms]]
 id      = "ch_phi"
 kind    = "CH"                # term type (registered key)
