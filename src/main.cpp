@@ -26,7 +26,9 @@ int main(int argc, char *argv[]) {
 
     circa::log::init();
 
-    circa::cfg::GeneralConfig<DIM> config;
+    circa::cfg::GeneralConfig<DIM> config; // this instance contains the TOML table storing all the "raw" options,
+                                           // which is passed around and therefore have to remain alive over the course 
+                                           // of the simulation.
     
     try {
         config = circa::cfg::load<DIM>(argv[1]);
@@ -51,47 +53,34 @@ int main(int argc, char *argv[]) {
         S.map["c"].a[i] = 0.0;
     }
 
-    FDOps<DIM> fd;
-
-    auto build_system = [&](FieldStore<DIM>& Sin, FieldStore<DIM>& dS) -> System<DIM> {
-        System<DIM> sys;
-        sys.add(std::make_unique<CHTerm<DIM, FE_CH_Landau, MobConst<DIM>, FDOps<DIM>>>(
-            Sin, dS, fd, "phi", FE_CH_Landau{0.8, 1.0}, MobConst<DIM>{1.0}));
-        // sys.add(std::make_unique<ACTerm<DIM, FE_AC_Linear, FDOps<DIM>>>(Sin, dS, fd, "c", "phi", FE_AC_Linear{0.1, 1.0}));
-        return sys;
-    };
-
     ParsedInput cfg;
     cfg.integrator = "euler";
     cfg.mass_fix = false;
     auto registry = make_integrator_registry<DIM>();
-    auto it = registry.find(cfg.integrator);
+    auto it = registry.find(config.integrator.name);
     if(it == registry.end()) {
         CIRCA_CRITICAL("Unknown integrator");
         exit(0);
     }
-    auto stepper = it->second(cfg, build_system, S);
-
-    double dt = 0.01, t = 0.0;
-    int steps = 1000, out_every = 10000, conf_every = 10000;
+    auto stepper = it->second(cfg, config.build_system_fn, S);
 
     circa::io::dump_all_fields_plain<DIM>(S, "init", 0, 0.0, false);
 
-    for(int s = 0; s <= steps; s++) {
-        if(s % out_every == 0) {
+    for(int64_t s = 0; s <= config.time.steps; s++) {
+        double t = s * config.time.dt;
+        if(s % config.out.output_every == 0) {
             const auto& phi = S.get("phi");
             double m_avg = mean(phi);
             double m_tot = circa::Diagnostics<DIM>::total_mass(phi);
 
-            auto sys_now = build_system(S, scratch);
+            auto sys_now = config.build_system_fn(S, scratch);
             double FE = circa::Diagnostics<DIM>::total_free_energy(sys_now);
-            std::cout << t << " " << FE << " " << m_avg << " " << s << "\n";
+            std::cout << fmt::format("{:.5} {:.8} {:.5} {:L}", t, FE, m_avg, s) << std::endl;
         }
-        if(s % conf_every == 0) {
+        if(s % config.out.conf_every == 0) {
             circa::io::dump_all_fields_plain<DIM>(S, "last", s, t, false);
         }
-        stepper->step(S, dt);
-        t += dt;
+        stepper->step(S, config.time.dt);
     }
     CIRCA_INFO("END OF SIMULATION");
     return 0;

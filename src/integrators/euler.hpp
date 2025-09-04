@@ -12,7 +12,7 @@ struct EulerOptions {
 template <int D>
 struct Euler : public IIntegrator<D> {
     EulerOptions opt;
-    explicit Euler(const BuildFn<D>& build, FieldStore<D>& S0, EulerOptions o) : IIntegrator<D>(build, S0), opt(std::move(o)) {}
+    explicit Euler(const BuildSysFn<D>& build, FieldStore<D>& S0, EulerOptions o) : IIntegrator<D>(build, S0), opt(std::move(o)) {}
 
     void step(FieldStore<D>& S, double dt) override {
         FieldStore<D> k1(S.g);

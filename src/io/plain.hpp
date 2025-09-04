@@ -49,7 +49,7 @@ inline void write_plain_scalar(const Field<D>& f,
             os << f.a[lin] << "\n";
         }
     } 
-    else {  // D==2
+    else if constexpr (D == 2) {
         const int ny = f.g.n[1];
         const double dy = f.g.dx[1];
         os << "# step = " << step

@@ -1,0 +1,59 @@
+# ===== Simulation scaffold =====
+[grid]
+n = 128
+L = 256.0
+
+[time]
+dt = 0.01
+steps = 1000
+
+[output]
+txt_append   = false
+output_every = 100
+conf_every   = 1000
+
+[integrator]
+name       = "euler"
+
+# optional: list of fields to allocate at start; terms can create them too
+[fields]
+names = ["phi", "c"]
+
+# ===== Terms =====
+# Array-of-tables: each entry is ONE term instance.
+# You can have many CH/AC/etc. terms, with different FE/mobility/options.
+
+[[terms]]
+id      = "ch_phi"
+kind    = "CH"                # term type (registered key)
+target  = "phi"               # which field it updates
+enabled = true
+
+  [terms.ops]                 # which discretization backend this term uses
+  type = "fd"                 # "fd" | "spectral" (later)
+
+  [terms.free_energy]
+  type = "landau"             # registered FE key
+  eps = 0.8
+  kappa = 1.0                 # gradient penalty; used both in mu and energy
+
+  [terms.mobility]
+  type = "const"              # "const" | "exp_of_field" | "tabulated" ...
+  M0 = 1.0
+
+[[terms]]
+id      = "ac_c"
+kind    = "AC"
+target  = "c"
+enabled = false
+
+  [terms.ops]
+  type = "fd"
+
+  [terms.free_energy]
+  type  = "gel"            # registered FE key for AC
+  Mc    = 0.1
+  gcoef = 1.0
+
+  [terms.coupling]
+  driver = "phi"              # AC uses g(phi) in dF/dc

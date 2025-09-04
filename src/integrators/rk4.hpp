@@ -10,7 +10,7 @@ struct RK4Options {
 template <int D>
 struct RK4 : IIntegrator<D> {
     RK4Options opt;
-    explicit RK4(const BuildFn<D>& build, FieldStore<D>& S0, RK4Options o) : IIntegrator<D>(build, S0), opt(std::move(o)) {}
+    explicit RK4(const BuildSysFn<D>& build, FieldStore<D>& S0, RK4Options o) : IIntegrator<D>(build, S0), opt(std::move(o)) {}
 
     void step(FieldStore<D>& S, double dt) override {
         FieldStore<D> k1(S.g), k2(S.g), k3(S.g), k4(S.g);

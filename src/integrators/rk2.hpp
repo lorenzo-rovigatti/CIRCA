@@ -12,7 +12,7 @@ template <int D>
 struct RK2 : public IIntegrator<D> {
     RK2Options opt;
 
-    explicit RK2(const BuildFn<D>& build, FieldStore<D>& S0, RK2Options o) : IIntegrator<D>(build, S0), opt(std::move(o)) {
+    explicit RK2(const BuildSysFn<D>& build, FieldStore<D>& S0, RK2Options o) : IIntegrator<D>(build, S0), opt(std::move(o)) {
         
     }
 

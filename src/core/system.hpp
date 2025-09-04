@@ -32,4 +32,7 @@ struct System {
     }
 };
 
+template <int D>
+using BuildSysFn = std::function<System<D>(FieldStore<D>& /*S_in*/, FieldStore<D>& /*dSdt_out*/)>;
+
 }  // namespace circa

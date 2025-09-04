@@ -11,13 +11,22 @@ include_directories(extern extern/spdlog/include)
 add_subdirectory(extern/spdlog)
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-add_library(circa_lib INTERFACE)
+set(sources
+    src/util/config.cpp
+)
+
+add_library(circa_lib ${sources})
+target_link_libraries(circa_lib PRIVATE spdlog::spdlog)
 
 add_executable(circa_1D src/main.cpp)
 add_executable(circa_2D src/main.cpp)
+add_executable(circa_3D src/main.cpp)
 
-target_link_libraries(circa_1D PRIVATE spdlog::spdlog circa_lib)
+target_link_libraries(circa_1D PRIVATE circa_lib)
 target_compile_definitions(circa_1D PRIVATE DIM=1)
 
-target_link_libraries(circa_2D PRIVATE spdlog::spdlog circa_lib)
+target_link_libraries(circa_2D PRIVATE circa_lib)
 target_compile_definitions(circa_2D PRIVATE DIM=2)
+
+target_link_libraries(circa_3D PRIVATE circa_lib)
+target_compile_definitions(circa_3D PRIVATE DIM=3)
