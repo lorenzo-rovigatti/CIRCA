@@ -12,7 +12,6 @@ add_subdirectory(extern/spdlog)
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(circa_lib INTERFACE)
-target_include_directories(circa_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(circa_1D src/main.cpp)
 add_executable(circa_2D src/main.cpp)

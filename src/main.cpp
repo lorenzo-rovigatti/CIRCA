@@ -1,35 +1,46 @@
 #include <iostream>
 #include <random>
 
-#include "circa/core/diagnostics.hpp"
-#include "circa/core/field_store.hpp"
-#include "circa/core/grid.hpp"
-#include "circa/core/system.hpp"
-#include "circa/io/log.hpp"
-#include "circa/io/plain.hpp"
-#include "circa/integrators/registry.hpp"
-#include "circa/ops/fd_ops.hpp"
-#include "circa/physics/fe_ac_linear.hpp"
-#include "circa/physics/fe_ch_landau.hpp"
-#include "circa/physics/mobility.hpp"
-#include "circa/terms/ac_term.hpp"
-#include "circa/terms/ch_term.hpp"
+#include "core/diagnostics.hpp"
+#include "core/field_store.hpp"
+#include "core/grid.hpp"
+#include "core/system.hpp"
+#include "integrators/registry.hpp"
+#include "io/log.hpp"
+#include "io/plain.hpp"
+#include "ops/fd_ops.hpp"
+#include "physics/fe_ac_linear.hpp"
+#include "physics/fe_ch_landau.hpp"
+#include "physics/mobility.hpp"
+#include "terms/ac_term.hpp"
+#include "terms/ch_term.hpp"
+#include "util/config.hpp"
 
 using namespace circa;
 
-int main() {
+int main(int argc, char *argv[]) {
+    if(argc < 2) {
+		std::cerr << fmt::format("Usage is {} configuration_file", argv[0]) << std::endl;
+		return 0;
+	}
+
     circa::log::init();
 
-    std::array<int, DIM> grid_cells;
-    grid_cells.fill(128);
-    std::array<double, DIM> grid_size;
-    grid_size.fill(256.0);
+    circa::cfg::GeneralConfig<DIM> config;
+    
+    try {
+        config = circa::cfg::load<DIM>(argv[1]);
+    }
+    catch (std::runtime_error &e) {
+        CIRCA_CRITICAL(e.what());
+        exit(1);
+    }
 
-    Grid<DIM> grid(grid_cells, grid_size);
+    Grid<DIM> grid(config.grid.n, config.grid.L);
     FieldStore<DIM> S(grid);
     FieldStore<DIM> scratch(grid); // used later as a placeholder
 
-    for(auto n : {"phi", "c"}) {
+    for(const auto &n : config.fields.names) {
         S.ensure(n);
     }
 
@@ -72,7 +83,6 @@ int main() {
             double m_avg = mean(phi);
             double m_tot = circa::Diagnostics<DIM>::total_mass(phi);
 
-            scratch.zero();
             auto sys_now = build_system(S, scratch);
             double FE = circa::Diagnostics<DIM>::total_free_energy(sys_now);
             std::cout << t << " " << FE << " " << m_avg << " " << s << "\n";

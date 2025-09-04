@@ -11,22 +11,30 @@ struct FieldStore {
     Grid<D> g;
     std::unordered_map<std::string, Field<D>> map;
     explicit FieldStore(const Grid<D>& gg) : g(gg) {}
+
     Field<D>& ensure(const std::string& name) {
         auto it = map.find(name);
-        if (it == map.end()) it = map.emplace(name, Field<D>(g)).first;
+        if(it == map.end()) {
+            it = map.emplace(name, Field<D>(g)).first;
+        }
         return it->second;
     }
+
     const Field<D>& get(const std::string& name) const {
         auto it = map.find(name);
-        if (it == map.end()) throw std::runtime_error("Missing field: " + name);
+        if(it == map.end()) throw std::runtime_error("Missing field: " + name);
         return it->second;
     }
+
     const Field<D>* maybe(const std::string& name) const {
         auto it = map.find(name);
         return it == map.end() ? nullptr : &it->second;
     }
+    
     void zero() {
-        for (auto& kv : map) kv.second.fill(0.0);
+        for(auto& kv : map) {
+            kv.second.fill(0.0);
+        }
     }
 };
 
