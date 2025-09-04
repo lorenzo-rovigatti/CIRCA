@@ -15,36 +15,6 @@
 
 namespace circa::cfg {
 
-// -------------------- helpers --------------------
-inline const toml::table* as_table_ptr(const toml::node_view<const toml::node>& nv) {
-    if(!nv) return nullptr;
-    return nv.as_table();
-}
-
-template <typename T>
-inline T value_or_t(const toml::table& t, std::string_view key, T def) {
-    if(auto v = t[key].template value<T>()) return *v;
-    return def;
-}
-
-template <typename T>
-inline T value_or_t(const toml::table* tp, std::string_view key, T def) {
-    if(!tp) return def;
-    return value_or_t<T>(*tp, key, def);
-}
-
-template <int D, typename T>
-inline std::array<T, D> array_or(const toml::array* a, const std::array<T, D>& def) {
-    if(!a || a->size() != D) return def;
-    std::array<T, D> out{};
-    for(int i = 0; i < D; ++i) {
-        out[i] = (*a)[size_t(i)].template value<T>().value_or(def[i]);
-    }
-    return out;
-}
-
-// -------------------- parsed term spec --------------------
-
 template <int D>
 struct TermSpec {
     std::string id;
@@ -124,12 +94,12 @@ template <int D, class FE, class MOB>
 inline std::unique_ptr<ITerm<D>> make_CH_term(FieldStore<D>& S, FieldStore<D>& dS,
                                               const DerivOps<D>& ops_any,
                                               const std::string& target,
-                                              const FE& fe, const MOB& mob) {
+                                              const FE& fe, const MOB& mob, double k) {
     auto fd = dynamic_cast<const FDOps<D>*>(&ops_any);
     if(!fd) {
         throw std::runtime_error("CHTerm currently requires FDOps backend");
     }
-    return std::make_unique<CHTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, target, fe, mob);
+    return std::make_unique<CHTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, target, fe, mob, k);
 }
 
 // AC term factory for specific FE type
@@ -150,38 +120,41 @@ inline std::unique_ptr<ITerm<D>> make_AC_term(FieldStore<D>& S, FieldStore<D>& d
 template <int D>
 inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>& dS, const TermSpec<D>& spec) {
     // Resolve ops
-    const toml::table* ops_tbl = as_table_ptr(spec.tbl->operator[]("ops"));
+    const toml::table *ops_tbl = as_table_ptr(spec.tbl->operator[]("ops"));
     const DerivOps<D>& ops = resolve_ops<D>(spec.ops_type, ops_tbl);
 
     // Branch on term kind
     if(spec.kind == "CH") {
         const toml::table* fe_tbl = as_table_ptr(spec.tbl->operator[]("free_energy"));
         const toml::table* mob_tbl = as_table_ptr(spec.tbl->operator[]("mobility"));
-        if(!fe_tbl) throw std::runtime_error(spec.id + ": [free_energy] missing");
+        if(!fe_tbl) {
+            throw std::runtime_error(spec.id + ": [free_energy] missing");
+        }
         // FE selection
-        const std::string fe_type = value_or_t<std::string>(fe_tbl, "type", "");
-        if(fe_type.empty()) throw std::runtime_error(spec.id + ": free_energy.type missing");
+        const std::string fe_type = value_or<std::string>(fe_tbl, "type", "");
+        if(fe_type.empty()) {
+            throw std::runtime_error(spec.id + ": free_energy.type missing");
+        }
 
         // Mobility selection (default const)
-        std::string mob_type = value_or_t<std::string>(mob_tbl, "type", "const");
+        std::string mob_type = value_or<std::string>(mob_tbl, "type", "const");
 
         // --- FE_CH_Landau ---
         if(fe_type == "landau") {
-            FE_CH_Landau fe;
-            fe.eps = value_or_t<double>(fe_tbl, "eps", fe.eps);
-            fe.kappa = value_or_t<double>(fe_tbl, "kappa", fe.kappa);
+            double k = *value_or_die<double>(*spec.tbl, "kappa");
+            FE_CH_Landau fe(*fe_tbl);
 
             if(mob_type == "const") {
                 MobConst<D> m;
-                m.M0 = value_or_t<double>(mob_tbl, "M0", m.M0);
-                return make_CH_term<D, FE_CH_Landau, MobConst<D>>(S, dS, ops, spec.target, fe, m);
-            } 
+                m.M0 = value_or<double>(mob_tbl, "M0", m.M0);
+                return make_CH_term<D, FE_CH_Landau, MobConst<D>>(S, dS, ops, spec.target, fe, m, k);
+            }
             else if(mob_type == "exp_of_field") {
                 MobExpOfField<D> m;
-                m.field = value_or_t<std::string>(mob_tbl, "field", "c");
-                m.c0 = value_or_t<double>(mob_tbl, "c0", 1.0);
-                return make_CH_term<D, FE_CH_Landau, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m);
-            } 
+                m.field = value_or<std::string>(mob_tbl, "field", "c");
+                m.c0 = value_or<double>(mob_tbl, "c0", 1.0);
+                return make_CH_term<D, FE_CH_Landau, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
+            }
             else {
                 throw std::runtime_error(spec.id + ": unknown mobility.type: " + mob_type);
             }
@@ -194,13 +167,13 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
         const toml::table* c_tbl = as_table_ptr(spec.tbl->operator[]("coupling"));
         if(!fe_tbl) throw std::runtime_error(spec.id + ": [free_energy] missing");
 
-        std::string driver = value_or_t<std::string>(c_tbl, "driver", "phi");
-        const std::string fe_type = value_or_t<std::string>(fe_tbl, "type", "");
+        std::string driver = value_or<std::string>(c_tbl, "driver", "phi");
+        const std::string fe_type = value_or<std::string>(fe_tbl, "type", "");
 
         if(fe_type == "linear") {
             FE_AC_Linear fe;
-            fe.Mc = value_or_t<double>(fe_tbl, "Mc", fe.Mc);
-            fe.gcoef = value_or_t<double>(fe_tbl, "gcoef", fe.gcoef);
+            fe.Mc = value_or<double>(fe_tbl, "Mc", fe.Mc);
+            fe.gcoef = value_or<double>(fe_tbl, "gcoef", fe.gcoef);
             return make_AC_term<D, FE_AC_Linear>(S, dS, ops, spec.target, driver, fe);
         }
 
@@ -208,18 +181,6 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
     }
 
     throw std::runtime_error(spec.id + ": unknown term kind: " + spec.kind);
-}
-
-template <typename T, size_t N>
-static std::array<T, N> array_from_toml(const toml::array& a, const char* key) {
-    if(a.size() != N) {
-        throw std::runtime_error(std::string("Expected ") + key + " to have " + std::to_string(N) + " elements");
-    }
-    std::array<T, N> out{};
-    for(size_t i = 0; i < N; ++i) {
-        out[i] = a[i].value<T>().value_or(T{});
-    }
-    return out;
 }
 
 template <int D> GeneralConfig<D> load(const std::string& path) {

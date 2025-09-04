@@ -12,10 +12,10 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
     std::string target;
     FE fe;
     M Mfun;
+    double kappa;
 
-    CHTerm(FieldStore<D>& S0, FieldStore<D>& dS0, const Ops& ops_,
-           std::string tgt, FE fe_, M m_)
-        : S(&S0), dSdt(&dS0), ops(ops_), target(std::move(tgt)), fe(fe_), Mfun(m_) {}
+    CHTerm(FieldStore<D>& S0, FieldStore<D>& dS0, const Ops& ops_, std::string tgt, FE fe_, M m_, double k)
+        : S(&S0), dSdt(&dS0), ops(ops_), target(std::move(tgt)), fe(fe_), Mfun(m_), kappa(k) {}
 
     void set_state(FieldStore<D>* Sin, FieldStore<D>* dSout) override {
         S = Sin;
@@ -28,7 +28,7 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
 
         Field<D> mu(u.g);
         for(int i = 0; i < u.g.size; ++i) {
-            mu.a[i] = fe.mu(u.a[i], lap_u.a[i]);
+            mu.a[i] = fe.mu(u.a[i]) - kappa * lap_u.a[i];
         }
 
         auto grad_mu = ops.gradient(mu);
@@ -63,7 +63,7 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
                 grad2 += gu[d].a[i] * gu[d].a[i];
             }
             double e_bulk = fe.bulk(u.a[i]);
-            double e_grad = fe.interfacial(u.a[i]) * grad2;
+            double e_grad = 0.5 * kappa * grad2;
             E += (e_bulk + e_grad) * u.g.dV;
         }
         return E;

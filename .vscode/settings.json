@@ -58,6 +58,8 @@
         "stop_token": "cpp",
         "thread": "cpp",
         "semaphore": "cpp",
-        "__nullptr": "cpp"
+        "__nullptr": "cpp",
+        "expected": "cpp",
+        "__node_handle": "cpp"
     }
 }

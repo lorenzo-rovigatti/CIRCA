@@ -28,6 +28,7 @@ id      = "ch_phi"
 kind    = "CH"                # term type (registered key)
 target  = "phi"               # which field it updates
 enabled = true
+kappa = 1.0
 
   [terms.ops]                 # which discretization backend this term uses
   type = "fd"                 # "fd" | "spectral" (later)

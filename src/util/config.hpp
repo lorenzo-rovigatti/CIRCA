@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../core/system.hpp"
+#include "toml.hpp"
 
 #include <array>
 #include <fstream>
@@ -8,13 +9,6 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-
-#define TOML_EXCEPTIONS 0
-#define TOML_ENABLE_FORMATTERS 0
-// the two define's that follow are require to work around a known toml++ bug (see https://github.com/marzer/tomlplusplus/issues/213)
-#define TOML_RETURN_BOOL_FROM_FOR_EACH_BROKEN 1
-#define TOML_RETURN_BOOL_FROM_FOR_EACH_BROKEN_ACKNOWLEDGED 1
-#include <toml++/toml.hpp>
 
 namespace circa::cfg {
 
