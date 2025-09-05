@@ -28,18 +28,20 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
 
         Field<D> mu(u.g);
         for(int i = 0; i < u.g.size; ++i) {
-            mu.a[i] = fe.mu(u.a[i]) - kappa * lap_u.a[i];
+            mu.a[i] = fe.mu(u.a[i]) - 2.0 * kappa * lap_u.a[i];
         }
 
         auto grad_mu = ops.gradient(mu);
         std::array<Field<D>, D> flux{Field<D>(u.g)};
-        for(int d = 1; d < D; ++d) {
+        for(int d = 1; d < D; d++) {
             flux[d] = Field<D>(u.g);
         }
         
         for(int i = 0; i < u.g.size; ++i) {
             double Mv = Mfun(i, *S);
-            for (int d = 0; d < D; ++d) flux[d].a[i] = Mv * grad_mu[d].a[i];
+            for(int d = 0; d < D; ++d) {
+                flux[d].a[i] = Mv * grad_mu[d].a[i];
+            }
         }
 
         Field<D> dudt = ops.divergence(flux);
@@ -51,20 +53,19 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
     }
 
     double energy() const override {
-        const Field<D>& u = S->get(target);
+        const Field<D> &u = S->get(target);
 
-        // gradient
         auto gu = ops.gradient(u);
 
         double E = 0.0;
-        for (int i = 0; i < u.g.size; ++i) {
+        for(int i = 0; i < u.g.size; ++i) {
             double grad2 = 0.0;
-            for (int d = 0; d < D; ++d) {
+            for(int d = 0; d < D; d++) {
                 grad2 += gu[d].a[i] * gu[d].a[i];
             }
             double e_bulk = fe.bulk(u.a[i]);
-            double e_grad = 0.5 * kappa * grad2;
-            E += (e_bulk + e_grad) * u.g.dV;
+            double e_interfacial = kappa * grad2;
+            E += (e_bulk + e_interfacial) * u.g.dV;
         }
         return E;
     }

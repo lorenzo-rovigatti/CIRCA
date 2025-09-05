@@ -65,21 +65,20 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        ParsedInput cfg;
-        cfg.integrator = "euler";
-        cfg.mass_fix = false;
         auto registry = make_integrator_registry<DIM>();
         auto it = registry.find(config.integrator.name);
         if(it == registry.end()) {
             CIRCA_CRITICAL("Unknown integrator");
             exit(0);
         }
-        auto stepper = it->second(cfg, config.build_system_fn, S);
+        auto stepper = it->second(config, config.build_system_fn, S);
 
         circa::io::dump_all_fields_plain<DIM>(S, "init", 0, 0.0, false);
 
-        for(int64_t s = 0; s <= config.time.steps; s++) {
-            double t = s * config.time.dt;
+        int64_t s = 0;
+        double t;
+        for(; s <= config.time.steps; s++) {
+            t = s * config.time.dt;
             if(s % config.out.output_every == 0) {
                 const auto& phi = S.get("phi");
                 double m_avg = mean(phi);
@@ -94,6 +93,9 @@ int main(int argc, char *argv[]) {
             }
             stepper->step(S, config.time.dt);
         }
+
+        circa::io::dump_all_fields_plain<DIM>(S, "last", s, t, false);
+
         CIRCA_INFO("END OF SIMULATION");
     }
     catch (const std::runtime_error &e) {

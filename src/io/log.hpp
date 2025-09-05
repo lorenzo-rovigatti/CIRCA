@@ -1,14 +1,26 @@
 #pragma once
-// Lightweight spdlog wrapper for C++17 that captures call-site information.
-// Usage:
-//   auto logger = circa::log::init(); // once
-//   CIRCA_INFO(logger, "hello {}!", 42);
+
+// ------------------------------------------------------------
+// This silences a known **false-positive** — Wstringop-overflow —
+// triggered by inlined std::atomic<bool>::operator bool() and
+// __atomic_load_n in GCC's <atomic> headers under optimization
+// or sanitizers. It's a compiler diagnostic issue, not a real bug.
 //
-// Pattern example:
-//   spdlog::set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] %s:%# %! | %v");
+// See GCC Bugzilla #113775: warning from __atomic_load_n as a
+// false positive due to sanitizer-influenced optimization paths.
+// Link: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=113775
+// ------------------------------------------------------------
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
+
+#if defined(__GNUC__) && !defined(__clang__)
+#  pragma GCC diagnostic pop
+#endif
 
 #include <memory>
 

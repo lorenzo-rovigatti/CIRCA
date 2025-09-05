@@ -33,9 +33,10 @@ inline void init_field_from_plain(const std::string& filename, Field<D>& f) {
         auto eqpos = line.find('=', pos);
         if(eqpos != std::string::npos) {
             std::string sizestr = line.substr(eqpos + 1);
-            // remove commas
-            for (auto& c : sizestr)
-                if (c == ',' || c == '=') c = ' ';
+            // remove commas, equal signs and x's (which can be used to separate dimensions)
+            for (auto& c : sizestr) {
+                if (c == ',' || c == '=' || c == 'x') c = ' ';
+            }
             std::istringstream ss(sizestr);
             std::vector<int> sizevals;
             int v;

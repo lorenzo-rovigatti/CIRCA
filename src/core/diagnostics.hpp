@@ -19,8 +19,10 @@ struct Diagnostics {
 
     static double total_free_energy(const System<D>& sys) {
         double FE = 0.0;
-        for (const auto& up : sys.terms) {
-            if (auto e = dynamic_cast<const IEnergy<D>*>(up.get())) FE += e->energy();
+        for(const auto& up : sys.terms) {
+            if(auto e = dynamic_cast<const IEnergy<D>*>(up.get())) {
+                FE += e->energy();
+            }
         }
         return FE;
     }

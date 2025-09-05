@@ -2,6 +2,7 @@
 #include "../util/toml.hpp"
 
 namespace circa {
+
 struct FE_CH_Landau {
     double eps;
 
@@ -10,11 +11,12 @@ struct FE_CH_Landau {
     }
 
     inline double bulk(double u) const {
-        return -(eps*0.5)*u*u + 0.25*u*u*u*u;
+        return -0.5 * eps * u * u + 0.25 * u * u * u * u;
     }
 
     inline double mu(double u) const { 
         return -eps * u + u * u * u;
     }
 };
+
 }  // namespace circa

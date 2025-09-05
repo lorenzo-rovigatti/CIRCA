@@ -1,4 +1,3 @@
-# ===== Simulation scaffold =====
 [grid]
 n = 128
 L = 256.0
@@ -42,7 +41,7 @@ kappa = 1.0
   eps = 0.8
 
   [terms.mobility]
-  type = "const"              # "const" | "exp_of_field" | "tabulated" ...
+  type = "const"              # "const" | "exp_of_field"
   M0 = 1.0
 
 [[terms]]

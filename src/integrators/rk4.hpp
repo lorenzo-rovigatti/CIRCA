@@ -1,16 +1,12 @@
 #pragma once
 #include "integrator.hpp"
+#include "../util/config.hpp"
 
 namespace circa {
 
-struct RK4Options {
-    bool enable_filter = false;
-};
-
 template <int D>
 struct RK4 : IIntegrator<D> {
-    RK4Options opt;
-    explicit RK4(const BuildSysFn<D>& build, FieldStore<D>& S0, RK4Options o) : IIntegrator<D>(build, S0), opt(std::move(o)) {}
+    explicit RK4(const BuildSysFn<D>& build, FieldStore<D>& S0, const cfg::GeneralConfig<D> &config) : IIntegrator<D>(build, S0) {}
 
     void step(FieldStore<D>& S, double dt) override {
         FieldStore<D> k1(S.g), k2(S.g), k3(S.g), k4(S.g);
