@@ -24,12 +24,14 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-    circa::log::init();
+    circa::log::init_and_get();
 
     try {
         // this instance contains the TOML table storing all the "raw" options, which is passed 
         // around and therefore have to remain alive over the course of the simulation.
-         circa::cfg::GeneralConfig<DIM> config = circa::cfg::load<DIM>(argv[1]);
+        circa::cfg::GeneralConfig<DIM> config = circa::cfg::load<DIM>(argv[1]);
+
+        CIRCA_INFO("Starting a {}D simulation", DIM);
 
         Grid<DIM> grid(config.grid.n, config.grid.L);
         FieldStore<DIM> S(grid);

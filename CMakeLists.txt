@@ -37,11 +37,11 @@ if(NOT CMAKE_BUILD_TYPE MATCHES Debug)
 	endif()
 endif()
 
-include_directories(extern extern/spdlog/include)
-
 # build spdlog
 add_subdirectory(extern/spdlog)
 set_target_properties(spdlog PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
+include_directories(extern extern/spdlog/include)
 
 set(sources
     src/util/config.cpp

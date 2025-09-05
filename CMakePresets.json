@@ -1,0 +1,31 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 19,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/"
+    },
+    {
+      "name": "g_only",
+      "inherits": "base",
+      "description": "G=1",
+      "cacheVariables": {
+        "G": "1"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "description": "Debug=1",
+      "cacheVariables": {
+        "Debug": "1"
+      }
+    }
+  ]
+}
