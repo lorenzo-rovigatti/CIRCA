@@ -5,7 +5,6 @@ namespace circa {
 
 template <int D>
 struct Diagnostics {
-    // total mass of a scalar field (integral ∫ u dV)
     static double total_mass(const Field<D>& f) {
         double sum = 0.0;
         for(double v : f.a) {
@@ -18,13 +17,12 @@ struct Diagnostics {
         return mean(f); 
     }
 
-    // ask each term that implements IEnergy<D>
     static double total_free_energy(const System<D>& sys) {
-        double E = 0.0;
+        double FE = 0.0;
         for (const auto& up : sys.terms) {
-            if (auto e = dynamic_cast<const IEnergy<D>*>(up.get())) E += e->energy();
+            if (auto e = dynamic_cast<const IEnergy<D>*>(up.get())) FE += e->energy();
         }
-        return E;
+        return FE;
     }
 };
 

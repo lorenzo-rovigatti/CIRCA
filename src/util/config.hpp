@@ -44,7 +44,7 @@ struct FieldInitialisation {
 
     std::string filename;
     double average;
-    double random_amplitude;
+    double random_stddev;
 };
 
 struct FieldsCfg {

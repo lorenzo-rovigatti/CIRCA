@@ -255,7 +255,7 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
         else if(init_opt == "random") {
             init_strat.strategy = init_strat.RANDOM;
             init_strat.average = *value_or_die<double>(*t, "average");
-            init_strat.random_amplitude = *value_or_die<double>(*t, "random_amplitude");
+            init_strat.random_stddev = *value_or_die<double>(*t, "random_stddev");
         }
         else if(init_opt == "from_file") {
             init_strat.strategy = init_strat.READ_FROM_FILE;

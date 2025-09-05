@@ -4,7 +4,7 @@ n = 128
 L = 256.0
 
 [time]
-dt = 0.01
+dt = 0.001
 steps = 1000
 
 [output]
@@ -15,12 +15,16 @@ conf_every   = 1000
 [integrator]
 name       = "euler"
 
-# optional: list of fields to allocate at start; terms can create them too
 [[fields]]
 name = "phi"
+initialisation = "random"
+average = 0.0
+random_stddev = 0.05
 
 [[fields]]
 name = "c"
+initialisation = "constant"
+average = 1e-3
 
 # ===== Terms =====
 [[terms]]
@@ -31,12 +35,11 @@ enabled = true
 kappa = 1.0
 
   [terms.ops]                 # which discretization backend this term uses
-  type = "fd"                 # "fd" | "spectral" (later)
+  type = "fd"                 # "fd" | "spectral" (not implemented yet)
 
   [terms.free_energy]
   type = "landau"             # registered FE key
   eps = 0.8
-  kappa = 1.0                 # gradient penalty; used both in mu and energy
 
   [terms.mobility]
   type = "const"              # "const" | "exp_of_field" | "tabulated" ...

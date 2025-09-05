@@ -35,25 +35,34 @@ int main(int argc, char *argv[]) {
         FieldStore<DIM> S(grid);
         FieldStore<DIM> scratch(grid); // used later as a placeholder
 
+        std::mt19937 rng(config.seed);
         for(uint32_t i = 0; i < config.fields.names.size(); i++) {
             auto name = config.fields.names[i];
             S.ensure(name);
             auto strat = config.fields.init_strategies[i];
             switch(strat.strategy) {
                 case strat.CONSTANT:
+                    CIRCA_INFO("Initialising '{}' field with constant value {}", name, strat.average);
                     S.map[name].fill(strat.average);
                     break;
+                case strat.RANDOM: {
+                    CIRCA_INFO("Initialising '{}' field with random values (mean = {}, std_dev = {})", name, strat.average, strat.random_stddev);
+                    std::normal_distribution<double> gaussian(strat.average, strat.random_stddev);
+                    for(int i = 0; i < grid.size; i++) {
+                        S.map[name].a[i] = gaussian(rng);
+                    }
+                    break;
+                }
+                case strat.READ_FROM_FILE:
+                    CIRCA_INFO("Initialising '{}' field from file '{}'", name, strat.filename);
+                    if constexpr (DIM < 3) {
+                        circa::io::init_field_from_plain<DIM>(strat.filename, S.map[name]);
+                    }
+                    else {
+                        throw std::runtime_error("Initialising fields from plain-text files is available only for 1 and 2 dimensions");
+                    }
+                    break;
             }
-        }
-        for(const auto &n : config.fields.names) {
-            S.ensure(n);
-        }
-
-        std::mt19937 rng(config.seed);
-        std::normal_distribution<double> nphi(0.0, 0.05);
-        for(int i = 0; i < grid.size; ++i) {
-            S.map["phi"].a[i] = nphi(rng);
-            S.map["c"].a[i] = 0.0;
         }
 
         ParsedInput cfg;
@@ -77,8 +86,8 @@ int main(int argc, char *argv[]) {
                 double m_tot = circa::Diagnostics<DIM>::total_mass(phi);
 
                 auto sys_now = config.build_system_fn(S, scratch);
-                double FE = circa::Diagnostics<DIM>::total_free_energy(sys_now);
-                std::cout << fmt::format("{:.5} {:.8} {:.5} {:L}", t, FE, m_avg, s) << std::endl;
+                double FE_avg = circa::Diagnostics<DIM>::total_free_energy(sys_now) / grid.size;
+                std::cout << fmt::format("{:.5} {:.8} {:.5} {:L}", t, FE_avg, m_avg, s) << std::endl;
             }
             if(s % config.out.conf_every == 0) {
                 circa::io::dump_all_fields_plain<DIM>(S, "last", s, t, false);
