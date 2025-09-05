@@ -16,6 +16,8 @@
 #include "terms/ch_term.hpp"
 #include "util/config.hpp"
 
+#include <spdlog/include/spdlog/fmt/ranges.h>
+
 using namespace circa;
 
 int main(int argc, char *argv[]) {
@@ -34,6 +36,9 @@ int main(int argc, char *argv[]) {
         CIRCA_INFO("Starting a {}D simulation", DIM);
 
         Grid<DIM> grid(config.grid.n, config.grid.L);
+
+        CIRCA_INFO("Grid: points = {}, n = {}, L = {}, dx = {}, dV = {}", grid.size, fmt::join(grid.n, " "), fmt::join(grid.L, " "), fmt::join(grid.dx, " "), grid.dV);
+
         FieldStore<DIM> S(grid);
         FieldStore<DIM> scratch(grid); // used later as a placeholder
         std::mt19937 rng(config.seed);
@@ -99,12 +104,13 @@ int main(int argc, char *argv[]) {
         for(step = initial_step; step <= initial_step + config.time.steps; step++) {
             t = step * config.time.dt;
             if(step % config.out.output_every == 0) {
-                const auto& phi = S.get("phi");
-                double m_avg = mean(phi);
-                double m_tot = circa::Diagnostics<DIM>::total_mass(phi);
+                double m_avg = 0.0;
+                for(auto &f : S.map) {
+                    m_avg += mean(f.second) * grid.dV;
+                }
 
                 auto sys_now = config.build_system_fn(S, scratch);
-                double FE_avg = circa::Diagnostics<DIM>::total_free_energy(sys_now) / grid.size;
+                double FE_avg = circa::Diagnostics<DIM>::total_free_energy(sys_now) * grid.dV / grid.size;
                 auto output_line = fmt::format("{:.5f} {:.8f} {:.5f} {:L}", t, FE_avg, m_avg, step);
 
                 std::cout << output_line << std::endl;
@@ -113,6 +119,8 @@ int main(int argc, char *argv[]) {
             if(step > initial_step && step % config.out.conf_every == 0) {
                 circa::io::dump_all_fields_plain<DIM>(S, "last", step, t, false);
 
+                // here we make sure that we append to the trajectory file if we are not at the first dump
+                // or if the user requested appending
                 static bool printed_once = false;
                 if(!printed_once && !config.out.output_append) {
                     circa::io::dump_all_fields_plain<DIM>(S, "trajectory", step, t, false);

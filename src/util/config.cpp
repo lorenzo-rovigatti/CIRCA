@@ -7,6 +7,7 @@
 #include "../ops/fd_ops.hpp"
 #include "../physics/fe_ac_linear.hpp"
 #include "../physics/fe_ch_landau.hpp"
+#include "../physics/fe_ch_wertheim.hpp"
 #include "../physics/mobility.hpp"
 #include "../terms/ac_term.hpp"
 #include "../terms/ch_term.hpp"
@@ -157,6 +158,26 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
                 m.field = value_or<std::string>(mob_tbl, "field", "c");
                 m.c0 = value_or<double>(mob_tbl, "c0", 1.0);
                 return make_CH_term<D, FE_CH_Landau, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
+            }
+            else {
+                throw std::runtime_error(spec.id + ": unknown mobility.type: " + mob_type);
+            }
+        }
+        // --- FE_CH_Landau ---
+        else if(fe_type == "wertheim") {
+            double k = *value_or_die<double>(*spec.tbl, "kappa");
+            FE_CH_Wertheim fe(*fe_tbl);
+
+            if(mob_type == "const") {
+                MobConst<D> m;
+                m.M0 = value_or<double>(mob_tbl, "M0", m.M0);
+                return make_CH_term<D, FE_CH_Wertheim, MobConst<D>>(S, dS, ops, spec.target, fe, m, k);
+            }
+            else if(mob_type == "exp_of_field") {
+                MobExpOfField<D> m;
+                m.field = value_or<std::string>(mob_tbl, "field", "c");
+                m.c0 = value_or<double>(mob_tbl, "c0", 1.0);
+                return make_CH_term<D, FE_CH_Wertheim, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
             }
             else {
                 throw std::runtime_error(spec.id + ": unknown mobility.type: " + mob_type);
