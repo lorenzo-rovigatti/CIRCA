@@ -7,11 +7,12 @@
 
 #include "../core/field_store.hpp"
 #include "../core/grid.hpp"
+#include "../util/strings.h"
 
 namespace circa::io {
 
 template <int D>
-inline void init_field_from_plain(const std::string& filename, Field<D>& f) {
+inline uint64_t init_field_from_plain(const std::string& filename, Field<D>& f) {
     std::ifstream is(filename);
     if(!is) {
         throw std::runtime_error("Cannot open file: " + filename);
@@ -22,32 +23,36 @@ inline void init_field_from_plain(const std::string& filename, Field<D>& f) {
     if(!std::getline(is, line)) {
         throw std::runtime_error("File is empty: " + filename);
     }
-    if(line.empty() || line[0] != '#') {
+    if(!util::starts_with(line, "#")) {
         throw std::runtime_error("Expected header starting with '#': " + filename);
     }
 
-    // parse size = Nx[,Ny]
-    std::size_t pos = line.find("size");
-    if(pos != std::string::npos) {
-        // crude parse: look for '=' and take the rest of the line
-        auto eqpos = line.find('=', pos);
-        if(eqpos != std::string::npos) {
-            std::string sizestr = line.substr(eqpos + 1);
-            // remove commas, equal signs and x's (which can be used to separate dimensions)
-            for (auto& c : sizestr) {
-                if (c == ',' || c == '=' || c == 'x') c = ' ';
-            }
-            std::istringstream ss(sizestr);
-            std::vector<int> sizevals;
-            int v;
-            while (ss >> v) sizevals.push_back(v);
-            if((int)sizevals.size() != D) {
-                throw std::runtime_error("Dimension mismatch when reading " + filename);
-            }
-            for(int d = 0; d < D; ++d) {
-                if(sizevals[d] != f.g.n[d]) {
-                    throw std::runtime_error("Grid size mismatch in " + filename);
-                }
+    util::trim(line);
+    auto spl = util::split(line, ",");
+    uint64_t initial_time;
+    if(spl.size() == 3) {
+        // parse the initial time
+        auto time_spl = util::split(spl[0], "=");
+        initial_time = std::stoll(time_spl[1]);
+        CIRCA_INFO("Initial time step (as parsed from '{}'): {}", filename, initial_time);
+
+        // parse the grid size
+        auto size_spl = util::split(spl[2], "=");
+        auto size_str = size_spl[1];
+        // remove the x that can be used to separate dimensions
+        for(auto& c : size_str) {
+            if(c == 'x') c = ' ';
+        }
+        std::istringstream ss(size_str);
+        std::vector<int> sizevals;
+        int v;
+        while (ss >> v) sizevals.push_back(v);
+        if((int)sizevals.size() != D) {
+            throw std::runtime_error(fmt::format("Dimension mismatch when reading '{}'", filename));
+        }
+        for(int d = 0; d < D; ++d) {
+            if(sizevals[d] != f.g.n[d]) {
+                throw std::runtime_error(fmt::format("Grid size mismatch in {}: size along the dimension {} is {}, should be {}", filename, d, sizevals[d], f.g.n[d]));
             }
         }
     }
@@ -73,6 +78,8 @@ inline void init_field_from_plain(const std::string& filename, Field<D>& f) {
     else {
         static_assert(D <= 2, "Plaintext format only defined for D=1,2");
     }
+
+    return initial_time;
 }
 
 // Write a single scalar field to a plain-text file.
@@ -87,7 +94,7 @@ inline void write_field_to_plain(const Field<D>& f,
                                const std::string& filename,
                                int step, double t,
                                bool append = false) {
-    if (DIM > 2) {
+    if constexpr (DIM > 2) {
         return;
     }
 
@@ -103,37 +110,31 @@ inline void write_field_to_plain(const Field<D>& f,
 
     os << std::setprecision(16);
     if constexpr (D == 1) {
-        os << "# step = " << step
-           << ", t = " << t
-           << ", size = " << nx
-           << ", dx = " << dx
-           << "\n";
-        for (int i = 0; i < nx; ++i) {
+        os << fmt::format("# step = {}, t = {}, size = {}, dx = {}", step, t, nx, dx) << std::endl;
+
+        for(int i = 0; i < nx; ++i) {
             std::array<int, 1> I{i};
             const int lin = flat<1>(I, f.g.n);
-            os << f.a[lin] << "\n";
+            os << f.a[lin] << std::endl;
         }
-    } else if constexpr (D == 2) {
+    } 
+    else if constexpr (D == 2) {
         const int ny = f.g.n[1];
         const double dy = f.g.dx[1];
-        os << "# step = " << step
-           << ", t = " << t
-           << ", size = " << nx << " " << ny
-           << ", dx = " << dx << " " << dy
-           << "\n";
+
+        os << fmt::format("# step = {}, t = {}, size = {} {}, dx = {} {}", step, t, nx, ny, dx, dy) << std::endl;
         // Row-major print: y as rows, x as columns
-        for (int j = 0; j < ny; ++j) {
-            for (int i = 0; i < nx; ++i) {
+        for(int j = 0; j < ny; ++j) {
+            for(int i = 0; i < nx; ++i) {
                 std::array<int, 2> I{i, j};
                 const int lin = flat<2>(I, f.g.n);
                 os << f.a[lin];
                 if (i + 1 < nx) os << " ";
             }
-            os << "\n";
+            os << std::endl;
         }
     }
-    // optional blank line separator when appending multiple snapshots:
-    os << "\n";
+    os << std::endl;
 }
 
 template <int D>
@@ -141,11 +142,11 @@ inline void dump_all_fields_plain(const FieldStore<D>& S,
                                   const std::string& prefix,
                                   int step, double t,
                                   bool append = false) {
-    if (DIM > 2) {
+    if constexpr (DIM > 2) {
         return;
     }
 
-    for (const auto& kv : S.map) {
+    for(const auto& kv : S.map) {
         const std::string& name = kv.first;
         const auto& f = kv.second;
 

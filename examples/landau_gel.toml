@@ -7,9 +7,10 @@ dt = 0.001
 steps = 1000
 
 [output]
-txt_append   = false
-output_every = 100
-conf_every   = 1000
+append_output   = false        # optional, this is the default
+output_filename = "energy.dat" # optional, this is the default
+output_every    = 100
+conf_every      = 1000
 
 [integrator]
 name       = "euler"

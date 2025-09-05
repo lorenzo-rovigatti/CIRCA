@@ -4,7 +4,10 @@
 #include <spdlog/spdlog.h>
 
 #include <memory>
-#include <mutex>
+
+#ifndef SPDLOG_FUNCTION
+#define SPDLOG_FUNCTION __func__
+#endif
 
 namespace circa {
 namespace log {
@@ -18,17 +21,20 @@ init_and_get(const std::string& name = "circa",
     static std::shared_ptr<spdlog::logger> logger;
 
     std::call_once(once, [&] {
-        if (auto existing = spdlog::get(name)) {
+        if(auto existing = spdlog::get(name)) {
             logger = existing;
-        } else {
+        } 
+        else {
             logger = spdlog::stdout_color_mt(name);
         }
-        logger->set_level(level);
-        spdlog::set_pattern(pattern);
-        spdlog::set_default_logger(logger);  // critical: make default logger non-null
+        spdlog::set_default_logger(logger);
     });
 
-    // You may still tweak level/pattern after first call if desired.
+    if(logger) {
+        logger->set_level(level);
+        logger->set_pattern(pattern);
+    }
+
     return logger;
 }
 
@@ -37,11 +43,11 @@ init_and_get(const std::string& name = "circa",
 
 #define CIRCA_LOG(level, ...)                                                \
     do {                                                                     \
-        auto lg = ::circa::log::init_and_get();                              \
-        if (lg && lg->should_log(level))                                     \
+        auto lg = circa::log::init_and_get();                              \
+        if(lg && lg->should_log(level))                                     \
             lg->log(spdlog::source_loc{__FILE__, __LINE__, SPDLOG_FUNCTION}, \
                     level, __VA_ARGS__);                                     \
-    } while (0)
+    } while(0)
 
 #define CIRCA_TRACE(...) CIRCA_LOG(spdlog::level::trace, __VA_ARGS__)
 #define CIRCA_DEBUG(...) CIRCA_LOG(spdlog::level::debug, __VA_ARGS__)

@@ -45,6 +45,7 @@ include_directories(extern extern/spdlog/include)
 
 set(sources
     src/util/config.cpp
+	src/util/strings.cpp
 )
 
 add_library(circa_lib ${sources})

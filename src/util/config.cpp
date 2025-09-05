@@ -223,9 +223,10 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
 
     // output
     if(auto o = config.raw_table["output"]) {
-        config.out.txt_append = o["txt_append"].value_or(config.out.txt_append);
-        config.out.output_every = o["output_every"].value_or(config.out.output_every);
-        config.out.conf_every = o["conf_every"].value_or(config.out.conf_every);
+        config.out.output_append = o["output_append"].value_or(config.out.output_append);
+        config.out.output_filename = o["output_filename"].value_or(config.out.output_filename);
+        config.out.output_every = *value_or_die<int>(*o.as_table(), "output_every");
+        config.out.conf_every = *value_or_die<int>(*o.as_table(), "conf_every");
     }
 
     // integrator

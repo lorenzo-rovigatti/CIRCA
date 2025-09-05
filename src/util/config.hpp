@@ -25,9 +25,10 @@ struct TimeCfg {
 };
 
 struct OutputCfg {
-    bool txt_append = false;
-    int conf_every = 1000;
-    int output_every = 100;
+    bool output_append = false;
+    std::string output_filename = "energy.dat";
+    int output_every;
+    int conf_every;
 };
 
 struct IntegratorCfg {

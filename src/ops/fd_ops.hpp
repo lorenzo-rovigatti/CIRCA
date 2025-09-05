@@ -8,10 +8,10 @@ template <int D>
 struct FDOps : DerivOps<D> {
     Field<D> laplacian(const Field<D>& f) const override {
         Field<D> out(f.g);
-        for (int i = 0; i < f.g.size; ++i) {
+        for(int i = 0; i < f.g.size; i++) {
             auto I = unflat<D>(i, f.g.n);
             double acc = 0.0;
-            for (int d = 0; d < D; ++d) {
+            for(int d = 0; d < D; d++) {
                 auto Ip = I, Im = I;
                 Ip[d] = (I[d] + 1 == f.g.n[d]) ? 0 : I[d] + 1;
                 Im[d] = (I[d] == 0) ? f.g.n[d] - 1 : I[d] - 1;
