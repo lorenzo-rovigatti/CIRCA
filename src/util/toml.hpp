@@ -51,6 +51,11 @@ std::optional<T> value_or_die(const toml::table& tbl, std::string_view key_path)
     return std::nullopt;
 }
 
+template <class T>
+std::optional<T> value_or_die(const toml::table* tbl, std::string_view key_path) {
+    return value_or_die<T>(*tbl, key_path);
+}
+
 // Convenience: returns T or a default; logs when default is used (optional).
 template <class T>
 T value_or(const toml::table& tbl, std::string_view key_path, T default_value) {

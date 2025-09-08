@@ -5,7 +5,7 @@
 #include "../core/system.hpp"
 #include "../io/log.hpp"
 #include "../ops/fd_ops.hpp"
-#include "../physics/fe_ac_linear.hpp"
+#include "../physics/fe_ac_gel.hpp"
 #include "../physics/fe_ch_landau.hpp"
 #include "../physics/fe_ch_wertheim.hpp"
 #include "../physics/mobility.hpp"
@@ -24,24 +24,6 @@ struct TermSpec {
     std::string ops_type;    // "fd" | "spectral" | ...
     const toml::table* tbl;  // pointer into root TOML (kept alive by caller)
 };
-
-// -------------------- builder from TOML --------------------
-//
-// Expected TOML for each [[terms]]:
-//
-// [[terms]]
-// id="ch_phi"; kind="CH"; target="phi"; enabled=true
-//   [terms.ops] type="fd"
-//   [terms.free_energy] type="landau"; eps=0.8; kappa=1.0
-//   [terms.mobility] type="const"; M0=1.0
-//
-// [[terms]]
-// id="ac_c"; kind="AC"; target="c"; enabled=true
-//   [terms.ops] type="fd"
-//   [terms.free_energy] type="linear"; Mc=0.1; gcoef=1.0
-//   [terms.coupling] driver="phi"
-//
-// ------------------------------------------------------------
 
 template <int D>
 inline std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
@@ -145,7 +127,7 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
 
         // --- FE_CH_Landau ---
         if(fe_type == "landau") {
-            double k = *value_or_die<double>(*spec.tbl, "kappa");
+            double k = *value_or_die<double>(spec.tbl, "kappa");
             FE_CH_Landau fe(*fe_tbl);
 
             if(mob_type == "const") {
@@ -155,8 +137,8 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
             }
             else if(mob_type == "exp_of_field") {
                 MobExpOfField<D> m;
-                m.field = value_or<std::string>(mob_tbl, "field", "c");
-                m.c0 = value_or<double>(mob_tbl, "c0", 1.0);
+                m.field = *value_or_die<std::string>(mob_tbl, "field");
+                m.c0 = *value_or_die<double>(mob_tbl, "c0");
                 return make_CH_term<D, FE_CH_Landau, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
             }
             else {
@@ -175,8 +157,8 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
             }
             else if(mob_type == "exp_of_field") {
                 MobExpOfField<D> m;
-                m.field = value_or<std::string>(mob_tbl, "field", "c");
-                m.c0 = value_or<double>(mob_tbl, "c0", 1.0);
+                m.field = *value_or_die<std::string>(mob_tbl, "field");
+                m.c0 = *value_or_die<double>(mob_tbl, "c0");
                 return make_CH_term<D, FE_CH_Wertheim, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
             }
             else {
@@ -194,11 +176,9 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
         std::string driver = value_or<std::string>(c_tbl, "driver", "phi");
         const std::string fe_type = value_or<std::string>(fe_tbl, "type", "");
 
-        if(fe_type == "linear") {
-            FE_AC_Linear fe;
-            fe.Mc = value_or<double>(fe_tbl, "Mc", fe.Mc);
-            fe.gcoef = value_or<double>(fe_tbl, "gcoef", fe.gcoef);
-            return make_AC_term<D, FE_AC_Linear>(S, dS, ops, spec.target, driver, fe);
+        if(fe_type == "gel") {
+            FE_AC_Gel fe(*fe_tbl);
+            return make_AC_term<D, FE_AC_Gel>(S, dS, ops, spec.target, driver, fe);
         }
 
         throw std::runtime_error(spec.id + ": unknown AC free_energy.type: " + fe_type);
@@ -236,25 +216,6 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
         config.grid.L.fill(*gsec["L"].template value<double>());
     }
 
-    // time
-    if(auto t = config.raw_table["time"]) {
-        config.time.dt = t["dt"].value_or(config.time.dt);
-        config.time.steps = t["steps"].value_or(config.time.steps);
-    }
-
-    // output
-    if(auto o = config.raw_table["output"]) {
-        config.out.output_append = o["output_append"].value_or(config.out.output_append);
-        config.out.output_filename = o["output_filename"].value_or(config.out.output_filename);
-        config.out.output_every = *value_or_die<int>(*o.as_table(), "output_every");
-        config.out.conf_every = *value_or_die<int>(*o.as_table(), "conf_every");
-    }
-
-    // integrator
-    if(auto isec = config.raw_table["integrator"]) {
-        config.integrator.name = isec["name"].value_or(config.integrator.name);
-    }
-
     // fields
     auto fields = config.raw_table["fields"].as_array();
     if(!fields) {
@@ -290,6 +251,48 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
 
         config.fields.names.push_back(name);
         config.fields.init_strategies.push_back(init_strat);
+    }
+
+    // time
+    if(auto t = config.raw_table["time"]) {
+        config.time.dt = t["dt"].value_or(config.time.dt);
+        config.time.steps = t["steps"].value_or(config.time.steps);
+    }
+
+    // output
+    if(auto o = config.raw_table["output"]) {
+        config.out.output_append = o["output_append"].value_or(config.out.output_append);
+        config.out.output_filename = o["output_filename"].value_or(config.out.output_filename);
+        config.out.output_every = *value_or_die<int>(*o.as_table(), "output_every");
+        config.out.conf_every = *value_or_die<int>(*o.as_table(), "conf_every");
+
+        if(auto arr = o["mass_fields"].as_array()) {
+            config.out.mass_fields.reserve(arr->size());
+            for(auto&& v : *arr) {
+                if(auto s = v.template value<std::string>()) {
+                    config.out.mass_fields.push_back(*s);
+                }
+                else {
+                    throw std::runtime_error("mass_fields must be strings");
+                }
+            }
+        }
+        else {
+            auto field_str = *value_or_die<std::string>(*o.as_table(), "mass_fields");
+            config.out.mass_fields.push_back(field_str);
+        }
+
+        // check that the "mass fields" exist
+        for(auto &s : config.out.mass_fields) {
+            if(std::find(config.fields.names.begin(), config.fields.names.end(), s) == config.fields.names.end()) {
+                throw std::runtime_error("mass_fields refers to unknown field: " + s);
+            }
+        }
+    }
+
+    // integrator
+    if(auto isec = config.raw_table["integrator"]) {
+        config.integrator.name = isec["name"].value_or(config.integrator.name);
     }
 
     auto specs = parse_term_specs<D>(config.raw_table);

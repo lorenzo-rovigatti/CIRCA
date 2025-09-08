@@ -13,10 +13,6 @@ struct Diagnostics {
         return sum * f.g.dV;
     }
     
-    static double mean_value(const Field<D>& f) { 
-        return mean(f); 
-    }
-
     static double total_free_energy(const System<D>& sys) {
         double FE = 0.0;
         for(const auto& up : sys.terms) {

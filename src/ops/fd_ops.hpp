@@ -6,7 +6,7 @@ namespace circa {
 
 template <int D>
 struct FDOps : DerivOps<D> {
-    Field<D> laplacian(const Field<D>& f) const override {
+    Field<D> laplacian(const Field<D> &f) const override {
         Field<D> out(f.g);
         for(int i = 0; i < f.g.size; i++) {
             auto I = unflat<D>(i, f.g.n);
@@ -22,7 +22,7 @@ struct FDOps : DerivOps<D> {
         return out;
     }
     
-    std::array<Field<D>, D> gradient(const Field<D>& f) const override {
+    std::array<Field<D>, D> gradient(const Field<D> &f) const override {
         std::array<Field<D>, D> g{Field<D>(f.g)};
         for(int d = 1; d < D; ++d) g[d] = Field<D>(f.g);
         for(int i = 0; i < f.g.size; i++) {
@@ -37,7 +37,7 @@ struct FDOps : DerivOps<D> {
         return g;
     }
 
-    Field<D> divergence(const std::array<Field<D>, D>& v) const override {
+    Field<D> divergence(const std::array<Field<D>, D> &v) const override {
         Field<D> out(v[0].g);
         for(int i = 0; i < out.g.size; i++) {
             auto I = unflat<D>(i, out.g.n);
@@ -47,6 +47,44 @@ struct FDOps : DerivOps<D> {
                 Ip[d] = (I[d] + 1 == out.g.n[d]) ? 0 : I[d] + 1;
                 Im[d] = (I[d] == 0) ? out.g.n[d] - 1 : I[d] - 1;
                 acc += (v[d].a[flat<D>(Ip, out.g.n)] - v[d].a[flat<D>(Im, out.g.n)]) / (2.0 * out.g.dx[d]);
+            }
+            out.a[i] = acc;
+        }
+        return out;
+    }
+
+    // Divergence of M * gradient of mu, where M is a scalar field
+    Field<D> div_M_grad(const Field<D> &M, const Field<D> &mu) const {
+        Field<D> out(mu.g);
+        out.fill(0.0);
+
+        for (int i = 0; i < mu.g.size; ++i) {
+            auto I = unflat<D>(i, mu.g.n);
+            double acc = 0.0;
+
+            for (int d = 0; d < D; ++d) {
+                // neighbors with periodic wrap
+                auto Ip = I, Im = I;
+                Ip[d] = (I[d] + 1 == mu.g.n[d]) ? 0 : I[d] + 1;
+                Im[d] = (I[d] == 0) ? mu.g.n[d] - 1 : I[d] - 1;
+                const int ip = flat<D>(Ip, mu.g.n);
+                const int im = flat<D>(Im, mu.g.n);
+
+                const double dx = mu.g.dx[d];
+
+                // mobility at faces
+                const double M_p = 0.5 * (M.a[i] + M.a[ip]);  // i+1/2 face
+                const double M_m = 0.5 * (M.a[i] + M.a[im]);  // i-1/2 face
+                // face gradients of mu
+                const double dmu_p = (mu.a[ip] - mu.a[i]) / dx;
+                const double dmu_m = (mu.a[i]  - mu.a[im]) / dx;
+
+                // fluxes at faces: J = M ∇μ  (no minus sign here)
+                const double Jp = M_p * dmu_p;
+                const double Jm = M_m * dmu_m;
+
+                // divergence contribution
+                acc += (Jp - Jm) / dx;
             }
             out.a[i] = acc;
         }

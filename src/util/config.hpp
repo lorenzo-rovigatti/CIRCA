@@ -29,6 +29,7 @@ struct OutputCfg {
     std::string output_filename = "energy.dat";
     int output_every;
     int conf_every;
+    std::vector<std::string> mass_fields;
 };
 
 struct IntegratorCfg {

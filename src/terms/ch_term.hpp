@@ -31,20 +31,16 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
             mu.a[i] = fe.mu(u.a[i]) - 2.0 * kappa * lap_u.a[i];
         }
 
-        auto grad_mu = ops.gradient(mu);
-        std::array<Field<D>, D> flux{Field<D>(u.g)};
-        for(int d = 1; d < D; d++) {
-            flux[d] = Field<D>(u.g);
-        }
-        
+        // mobility per cell
+        Field<D> mobility(u.g);
         for(int i = 0; i < u.g.size; ++i) {
-            double Mv = Mfun(i, *S);
-            for(int d = 0; d < D; ++d) {
-                flux[d].a[i] = Mv * grad_mu[d].a[i];
-            }
+            mobility.a[i] = Mfun(i, *S);
         }
 
-        Field<D> dudt = ops.divergence(flux);
+        // Conservative ∇·(M ∇μ)
+        Field<D> dudt = ops.div_M_grad(mobility, mu);
+
+        // Field<D> dudt = ops.divergence(flux);
         Field<D>& out = dSdt->ensure(target);
         if(out.empty()) out = Field<D>(u.g);
         for(int i = 0; i < u.g.size; ++i) {

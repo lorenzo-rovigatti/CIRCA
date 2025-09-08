@@ -24,8 +24,7 @@ struct ACTerm : ITerm<D> {
         const Field<D>& c = S->get(c_name);
         const Field<D>* drv = driver_name.empty() ? nullptr : S->maybe(driver_name);
         Field<D>& out = dSdt->ensure(c_name);
-        if (out.empty()) out = Field<D>(c.g);
-        for (int i = 0; i < c.g.size; ++i) {
+        for(int i = 0; i < c.g.size; i++) {
             double driver = drv ? drv->a[i] : 0.0;
             out.a[i] += -fe.dfdc(c.a[i], driver);
         }

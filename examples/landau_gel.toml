@@ -38,18 +38,18 @@ kappa = 1.0
   type = "fd"                 # "fd" | "spectral" (not implemented yet)
 
   [terms.free_energy]
-  type = "landau"             # registered FE key
+  type = "landau"             
   eps = 0.8
 
   [terms.mobility]
-  type = "const"              # "const" | "exp_of_field"
+  type = "exp_of_field"
   M0 = 1.0
 
 [[terms]]
 id      = "ac_c"
 kind    = "AC"
 target  = "c"
-enabled = false
+enabled = true
 
   [terms.ops]
   type = "fd"

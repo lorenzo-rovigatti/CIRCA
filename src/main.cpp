@@ -8,12 +8,6 @@
 #include "integrators/registry.hpp"
 #include "io/log.hpp"
 #include "io/plain.hpp"
-#include "ops/fd_ops.hpp"
-#include "physics/fe_ac_linear.hpp"
-#include "physics/fe_ch_landau.hpp"
-#include "physics/mobility.hpp"
-#include "terms/ac_term.hpp"
-#include "terms/ch_term.hpp"
 #include "util/config.hpp"
 
 #include <spdlog/include/spdlog/fmt/ranges.h>
@@ -96,6 +90,8 @@ int main(int argc, char *argv[]) {
 
         circa::io::dump_all_fields_plain<DIM>(S, "init", 0, 0.0, false);
 
+        auto diag_sys = config.build_system_fn(S, scratch);
+
         // main loop
         std::ios_base::openmode openmode = (config.out.output_append) ? std::ios_base::app : std::ios_base::out;
         std::ofstream output("energy.dat", openmode);
@@ -105,12 +101,11 @@ int main(int argc, char *argv[]) {
             t = step * config.time.dt;
             if(step % config.out.output_every == 0) {
                 double m_avg = 0.0;
-                for(auto &f : S.map) {
-                    m_avg += mean(f.second) * grid.dV;
+                for(auto &s : config.out.mass_fields) {
+                    m_avg += mean(S.map[s]) * grid.dV;
                 }
 
-                auto sys_now = config.build_system_fn(S, scratch);
-                double FE_avg = circa::Diagnostics<DIM>::total_free_energy(sys_now) * grid.dV / grid.size;
+                double FE_avg = circa::Diagnostics<DIM>::total_free_energy(diag_sys) * grid.dV / grid.size;
                 auto output_line = fmt::format("{:.5f} {:.8f} {:.5f} {:L}", t, FE_avg, m_avg, step);
 
                 std::cout << output_line << std::endl;
