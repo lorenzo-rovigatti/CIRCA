@@ -16,9 +16,9 @@ struct FE_AC_Gel {
     }
 
     inline double dfdc(double c, double driver) const {
-		double phi = (rescale_OP) ? (driver + 1.0) / 2.0 : driver;
-		double g = (p_gel * driver - critical_OP) / (1.0 - critical_OP);
-		return M_c * (c * c - g * c);
+        double phi = (rescale_OP) ? (driver + 1.0) / 2.0 : driver;
+        double g = (p_gel * phi - critical_OP) / (1.0 - critical_OP);
+        return M_c * (c * c - g * c);
     }
 };
 }  // namespace circa
