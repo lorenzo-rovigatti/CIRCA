@@ -12,9 +12,65 @@
 #include "../terms/ac_term.hpp"
 #include "../terms/ch_term.hpp"
 
+#include <variant>
 #include <string_view>
 
 namespace circa::cfg {
+
+using FE_CH_Any = std::variant<
+    FE_CH_Landau,
+    FE_CH_Wertheim
+>;
+
+FE_CH_Any parse_ch_fe_any(const toml::table& fe_tbl){
+    const auto type = fe_tbl["type"].template value<std::string>().value_or("");
+    if(type == "landau"){
+        FE_CH_Landau fe(fe_tbl);
+        return fe;
+    }
+    else if(type == "wertheim"){ 
+        FE_CH_Wertheim fe(fe_tbl);
+        return fe;
+    }
+    throw std::runtime_error("unknown CH free_energy.type: " + type);
+}
+
+template<int D>
+using MobAny = std::variant<
+    MobConst<D>,
+    MobExpOfField<D>
+>;
+
+template<int D>
+MobAny<D> parse_mob_any(const toml::table* mob_tbl){
+    const std::string type = value_or<std::string>(mob_tbl, "type", "const");
+    if(type == "const"){
+        MobConst<D> m;
+        m.M0 = value_or<double>(mob_tbl, "M0", m.M0);
+        return m;
+    }
+
+    if(type == "exp_of_field"){
+        MobExpOfField<D> m;
+        m.field = value_or<std::string>(mob_tbl, "field", "c");
+        m.c0    = value_or<double>(mob_tbl, "c0", 1.0);
+        return m;
+    }
+    throw std::runtime_error("unknown mobility.type: " + type);
+}
+
+using FE_AC_Any = std::variant<
+    FE_AC_Gel
+>;
+
+FE_AC_Any parse_ac_fe_any(const toml::table& fe_tbl){
+    const std::string fe_type = value_or<std::string>(fe_tbl, "type", "");
+    if(fe_type == "gel") {
+        FE_AC_Gel fe(fe_tbl);
+        return fe;
+    }
+    throw std::runtime_error("unknown AC free_energy.type: " + fe_type);
+}
 
 template <int D>
 struct TermSpec {
@@ -110,78 +166,52 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
     const DerivOps<D>& ops = resolve_ops<D>(spec.ops_type, ops_tbl);
 
     // Branch on term kind
-    if(spec.kind == "CH") {
-        const toml::table* fe_tbl = as_table_ptr(spec.tbl->operator[]("free_energy"));
+    if (spec.kind == "CH") {
+        const toml::table* fe_tbl  = as_table_ptr(spec.tbl->operator[]("free_energy"));
         const toml::table* mob_tbl = as_table_ptr(spec.tbl->operator[]("mobility"));
         if(!fe_tbl) {
             throw std::runtime_error(spec.id + ": [free_energy] missing");
         }
-        // FE selection
-        const std::string fe_type = value_or<std::string>(fe_tbl, "type", "");
-        if(fe_type.empty()) {
-            throw std::runtime_error(spec.id + ": free_energy.type missing");
-        }
 
-        // Mobility selection (default const)
-        std::string mob_type = value_or<std::string>(mob_tbl, "type", "const");
+        double k = *value_or_die<double>(spec.tbl, "kappa");
 
-        // --- FE_CH_Landau ---
-        if(fe_type == "landau") {
-            double k = *value_or_die<double>(spec.tbl, "kappa");
-            FE_CH_Landau fe(*fe_tbl);
+        auto fe_any  = parse_ch_fe_any(*fe_tbl);
+        auto mob_any = parse_mob_any<D>(mob_tbl);
 
-            if(mob_type == "const") {
-                MobConst<D> m;
-                m.M0 = value_or<double>(mob_tbl, "M0", m.M0);
-                return make_CH_term<D, FE_CH_Landau, MobConst<D>>(S, dS, ops, spec.target, fe, m, k);
-            }
-            else if(mob_type == "exp_of_field") {
-                MobExpOfField<D> m;
-                m.field = *value_or_die<std::string>(mob_tbl, "field");
-                m.c0 = *value_or_die<double>(mob_tbl, "c0");
-                return make_CH_term<D, FE_CH_Landau, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
-            }
-            else {
-                throw std::runtime_error(spec.id + ": unknown mobility.type: " + mob_type);
-            }
-        }
-        // --- FE_CH_Landau ---
-        else if(fe_type == "wertheim") {
-            double k = *value_or_die<double>(*spec.tbl, "kappa");
-            FE_CH_Wertheim fe(*fe_tbl);
-
-            if(mob_type == "const") {
-                MobConst<D> m;
-                m.M0 = value_or<double>(mob_tbl, "M0", m.M0);
-                return make_CH_term<D, FE_CH_Wertheim, MobConst<D>>(S, dS, ops, spec.target, fe, m, k);
-            }
-            else if(mob_type == "exp_of_field") {
-                MobExpOfField<D> m;
-                m.field = *value_or_die<std::string>(mob_tbl, "field");
-                m.c0 = *value_or_die<double>(mob_tbl, "c0");
-                return make_CH_term<D, FE_CH_Wertheim, MobExpOfField<D>>(S, dS, ops, spec.target, fe, m, k);
-            }
-            else {
-                throw std::runtime_error(spec.id + ": unknown mobility.type: " + mob_type);
-            }
-        }
-
-        throw std::runtime_error(spec.id + ": unknown CH free_energy.type: " + fe_type);
-    } 
+        return std::visit(
+            [&](auto&& fe, auto&& mob) -> std::unique_ptr<ITerm<D>> {
+                using FE  = std::decay_t<decltype(fe)>;
+                using MOB = std::decay_t<decltype(mob)>;
+                auto fd = dynamic_cast<const FDOps<D>*>(&ops);
+                if(!fd) {
+                    throw std::runtime_error("CHTerm requires FDOps backend");
+                }
+                return std::make_unique<CHTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, spec.target, fe, mob, k);
+            },
+            fe_any, mob_any
+        );
+    }
     else if(spec.kind == "AC") {
-        const toml::table* fe_tbl = as_table_ptr(spec.tbl->operator[]("free_energy"));
-        const toml::table* c_tbl = as_table_ptr(spec.tbl->operator[]("coupling"));
-        if(!fe_tbl) throw std::runtime_error(spec.id + ": [free_energy] missing");
-
-        std::string driver = value_or<std::string>(c_tbl, "driver", "phi");
-        const std::string fe_type = value_or<std::string>(fe_tbl, "type", "");
-
-        if(fe_type == "gel") {
-            FE_AC_Gel fe(*fe_tbl);
-            return make_AC_term<D, FE_AC_Gel>(S, dS, ops, spec.target, driver, fe);
+        const toml::table *fe_tbl = as_table_ptr(spec.tbl->operator[]("free_energy"));
+        const toml::table *c_tbl = as_table_ptr(spec.tbl->operator[]("coupling"));
+        if(!fe_tbl) {
+            throw std::runtime_error(spec.id + ": [free_energy] missing");
         }
 
-        throw std::runtime_error(spec.id + ": unknown AC free_energy.type: " + fe_type);
+        auto fe_any = parse_ac_fe_any(*fe_tbl);
+        std::string driver = value_or<std::string>(c_tbl, "driver", "phi");
+
+        return std::visit(
+            [&](auto&& fe) -> std::unique_ptr<ITerm<D>> {
+                using FE = std::decay_t<decltype(fe)>;
+                auto fd = dynamic_cast<const FDOps<D>*>(&ops);
+                if(!fd) {
+                    throw std::runtime_error("ACTerm requires FDOps backend");
+                }
+                return std::make_unique<ACTerm<D, FE, FDOps<D>>>(S, dS, *fd, spec.target, driver, fe);
+            },
+            fe_any
+        );
     }
 
     throw std::runtime_error(spec.id + ": unknown term kind: " + spec.kind);
