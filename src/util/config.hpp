@@ -30,6 +30,8 @@ struct OutputCfg {
     int output_every;
     int conf_every;
     std::vector<std::string> mass_fields;
+    bool print_vtk = false;
+    std::string vtk_dir = "vtk";
 };
 
 struct IntegratorCfg {

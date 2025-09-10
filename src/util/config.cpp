@@ -296,6 +296,17 @@ template <int D> GeneralConfig<D> load(const std::string& path) {
         config.out.output_every = *value_or_die<int>(*o.as_table(), "output_every");
         config.out.conf_every = *value_or_die<int>(*o.as_table(), "conf_every");
 
+        if constexpr (D < 3) {
+            config.out.print_vtk = o["print_vtk"].value_or(config.out.print_vtk);
+            config.out.vtk_dir = o["vtk_dir"].value_or(config.out.vtk_dir);
+        } 
+        else if constexpr (D == 3) { // for D == 3 the vtk output is the only possible one so we enable it by default
+            config.out.print_vtk = true;
+        }
+        else {
+            CIRCA_WARN("There is no output format available for D > 3");
+        }
+
         if(auto arr = o["mass_fields"].as_array()) {
             config.out.mass_fields.reserve(arr->size());
             for(auto&& v : *arr) {

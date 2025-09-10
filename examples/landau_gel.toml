@@ -11,6 +11,7 @@ append_output   = false        # optional, this is the default
 output_filename = "energy.dat" # optional, this is the default
 output_every    = 100
 conf_every      = 1000
+mass_fields = "phi"
 
 [integrator]
 name       = "euler"
@@ -43,7 +44,8 @@ kappa = 1.0
 
   [terms.mobility]
   type = "exp_of_field"
-  M0 = 1.0
+  field = "c"
+  c0 = 0.01
 
 [[terms]]
 id      = "ac_c"
@@ -56,8 +58,10 @@ enabled = true
 
   [terms.free_energy]
   type  = "gel"            # registered FE key for AC
-  Mc    = 0.1
-  gcoef = 1.0
+  critical_OP = 0.5
+  M_c = 0.02
+  p_gel = 0.9
+  rescale_OP = true
 
   [terms.coupling]
   driver = "phi"              # AC uses g(phi) in dF/dc

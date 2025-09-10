@@ -8,6 +8,7 @@
 #include "integrators/registry.hpp"
 #include "io/log.hpp"
 #include "io/plain.hpp"
+#include "io/vtk.hpp"
 #include "util/config.hpp"
 
 #include <spdlog/include/spdlog/fmt/ranges.h>
@@ -89,6 +90,9 @@ int main(int argc, char *argv[]) {
         auto stepper = it->second(config, config.build_system_fn, S);
 
         circa::io::dump_all_fields_plain<DIM>(S, "init", 0, 0.0, false);
+        if(config.out.print_vtk) {
+            circa::io::dump_all_fields_vtk<DIM>(S, config.out.vtk_dir, initial_step);
+        }
 
         auto diag_sys = config.build_system_fn(S, scratch);
 
@@ -113,6 +117,10 @@ int main(int argc, char *argv[]) {
             }
             if(step > initial_step && step % config.out.conf_every == 0) {
                 circa::io::dump_all_fields_plain<DIM>(S, "last", step, t, false);
+
+                if(config.out.print_vtk) {
+                    circa::io::dump_all_fields_vtk<DIM>(S, config.out.vtk_dir, step);
+                }
 
                 // here we make sure that we append to the trajectory file if we are not at the first dump
                 // or if the user requested appending
