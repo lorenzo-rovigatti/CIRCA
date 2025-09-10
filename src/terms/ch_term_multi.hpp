@@ -25,7 +25,6 @@ struct has_M_i {
 //   double M_i(int i_species, int idx_site, const FieldStore<D>& S)          // diagonal case
 // or
 //   double M_ibeta(int i_species, int beta_species, int idx_site, const FieldStore<D>& S) // full matrix
-
 template <int D, class FE, class MOB, class Ops>
 struct CHMultiTerm : ITerm<D> {
     FieldStore<D>* S = nullptr;
@@ -55,7 +54,7 @@ struct CHMultiTerm : ITerm<D> {
         }
 
         // μ_i
-        std::vector<Field<D>> mu = fe.template compute_mu<D>(*S, phi, lap);
+        std::vector<Field<D>> mu = fe.template mu<D>(*S, phi, lap);
 
         // ∇μ_i
         std::vector<std::array<Field<D>, D>> grad_mu;
@@ -66,9 +65,11 @@ struct CHMultiTerm : ITerm<D> {
         }
 
         // For each species i: J_i = -sum_beta M_{iβ} ∇μ_β   (diagonal => only β=i)
-        for (int i = 0; i < N; ++i) {
+        for(int i = 0; i < N; ++i) {
             std::array<Field<D>, D> flux;
-            for (int d = 0; d < D; ++d) flux[d] = Field<D>(phi[i]->g);
+            for (int d = 0; d < D; d++) {
+                flux[d] = Field<D>(phi[i]->g);
+            }
 
             if constexpr (has_M_i<MOB, D>::value) {
                 // diagonal mobility
@@ -77,12 +78,13 @@ struct CHMultiTerm : ITerm<D> {
                     for (int d = 0; d < D; ++d)
                         flux[d].a[p] = -Mi * grad_mu[i][d].a[p];
                 }
-            } else {
+            } 
+            else {
                 // full matrix mobility
-                for (int p = 0; p < phi[i]->g.size; ++p) {
-                    for (int d = 0; d < D; ++d) {
+                for(int p = 0; p < phi[i]->g.size; p++) {
+                    for (int d = 0; d < D; d++) {
                         double acc = 0.0;
-                        for (int b = 0; b < N; ++b) {
+                        for(int b = 0; b < N; b++) {
                             const double Mib = mob.M_ibeta(i, b, p, *S);
                             acc += -Mib * grad_mu[b][d].a[p];
                         }
@@ -94,8 +96,12 @@ struct CHMultiTerm : ITerm<D> {
             // dφ_i/dt = -∇·J_i
             Field<D> dphi_dt = ops.divergence(flux);
             Field<D>& out = dSdt->ensure(target[i]);
-            if (out.empty()) out = Field<D>(phi[i]->g);
-            for (int p = 0; p < phi[i]->g.size; ++p) out.a[p] += dphi_dt.a[p];
+            if(out.empty()) {
+                out = Field<D>(phi[i]->g);
+            }
+            for(int p = 0; p < phi[i]->g.size; p++) {
+                out.a[p] += dphi_dt.a[p];
+            }
         }
     }
 };

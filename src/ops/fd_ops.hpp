@@ -58,11 +58,11 @@ struct FDOps : DerivOps<D> {
         Field<D> out(mu.g);
         out.fill(0.0);
 
-        for (int i = 0; i < mu.g.size; ++i) {
+        for(int i = 0; i < mu.g.size; i++) {
             auto I = unflat<D>(i, mu.g.n);
             double acc = 0.0;
 
-            for (int d = 0; d < D; ++d) {
+            for(int d = 0; d < D; d++) {
                 // neighbors with periodic wrap
                 auto Ip = I, Im = I;
                 Ip[d] = (I[d] + 1 == mu.g.n[d]) ? 0 : I[d] + 1;

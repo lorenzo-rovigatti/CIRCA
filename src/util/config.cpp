@@ -8,9 +8,12 @@
 #include "../physics/fe_ac_gel.hpp"
 #include "../physics/fe_ch_landau.hpp"
 #include "../physics/fe_ch_wertheim.hpp"
+#include "../physics/fe_ch_multi_quad.hpp"
 #include "../physics/mobility.hpp"
+#include "../physics/mobility_multi.hpp"
 #include "../terms/ac_term.hpp"
 #include "../terms/ch_term.hpp"
+#include "../terms/ch_term_multi.hpp"
 
 #include <variant>
 #include <string_view>
@@ -72,11 +75,61 @@ FE_AC_Any parse_ac_fe_any(const toml::table& fe_tbl){
     throw std::runtime_error("unknown AC free_energy.type: " + fe_type);
 }
 
+using FE_CH_Multi_Any = std::variant<
+    FE_CH_MultiQuad
+>;
+
+inline FE_CH_Multi_Any parse_ch_multi_fe_any(const toml::table& fe_tbl){
+    const auto type = fe_tbl["type"].template value<std::string>().value_or("");
+
+    if(type == "multi_quad"){
+        FE_CH_MultiQuad fe;
+        fe.a = vector_or<double>(fe_tbl["a"].as_array(), {});
+        fe.b = vector_or<double>(fe_tbl["b"].as_array(), {});
+        fe.kappa = vector_or<double>(fe_tbl["kappa"].as_array(), {});
+        fe.chi = matrix_or<double>(fe_tbl["chi"].as_array(), {});
+        if(fe.a.empty() || fe.b.empty() || fe.kappa.empty() || fe.chi.empty()) {
+            throw std::runtime_error("[free_energy] multi_quad expects a, b, kappa, chi arrays");
+        }
+        return fe;
+    }
+    throw std::runtime_error("unknown CH_multi free_energy.type: " + type);
+}
+
+template<int D>
+using MobMultiAny = std::variant<
+    MobilityDiagConst<D>,
+    MobilityFullConst<D>
+>;
+
+template<int D>
+inline MobMultiAny<D> parse_multi_mob_any(const toml::table* mob_tbl){
+    const std::string type = value_or<std::string>(mob_tbl, "type", "diag_const");
+    if(type == "diag_const"){
+        MobilityDiagConst<D> m;
+        m.M = vector_or<double>(mob_tbl ? mob_tbl->operator[]("M").as_array() : nullptr, {});
+        if(m.M.empty()) {
+            throw std::runtime_error("[mobility] diag_const expects array M");
+        }
+        return m;
+    }
+    if(type == "full_const"){
+        MobilityFullConst<D> m;
+        m.M = matrix_or<double>(mob_tbl ? mob_tbl->operator[]("M").as_array() : nullptr, {});
+        if(m.M.empty()) {
+            throw std::runtime_error("[mobility] full_const expects matrix M");
+        }
+        return m;
+    }
+    throw std::runtime_error("unknown CH_multi mobility.type: " + type);
+}
+
 template <int D>
 struct TermSpec {
     std::string id;
     std::string kind;        // "CH" | "AC" | ...
     std::string target;      // field to update
+    std::vector<std::string> target_multi; // for multi-field terms
     std::string ops_type;    // "fd" | "spectral" | ...
     const toml::table* tbl;  // pointer into root TOML (kept alive by caller)
 };
@@ -102,10 +155,20 @@ inline std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
         TermSpec<D> s;
         s.id = t->operator[]("id").template value<std::string>().value_or(std::string{});
         s.kind = t->operator[]("kind").template value<std::string>().value_or(std::string{});
-        s.target = t->operator[]("target").template value<std::string>().value_or(std::string{});
+        if(s.kind == "CH") {
+            s.target = t->operator[]("target").template value<std::string>().value_or(std::string{});
+        }
+        if(s.kind == "CH_multi") {
+            s.target_multi = vector_or<std::string>(t->operator[]("targets").as_array(), {});
+            if(s.target_multi.empty()) {
+                CIRCA_CRITICAL("{}: CH_multi term requires non-empty 'targets' array", s.id);
+                throw std::runtime_error("");
+            }
+        }
         s.tbl = t;
-        if(s.kind.empty() || s.target.empty())
+        if(s.kind.empty() || s.target.empty()) {
             throw std::runtime_error("term missing 'kind' or 'target'");
+        }
 
         if(auto ops = t->operator[]("ops").as_table()) {
             s.ops_type = ops->operator[]("type").template value<std::string>().value_or("fd");
@@ -165,17 +228,16 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
     const toml::table *ops_tbl = as_table_ptr(spec.tbl->operator[]("ops"));
     const DerivOps<D>& ops = resolve_ops<D>(spec.ops_type, ops_tbl);
 
-    // Branch on term kind
-    if (spec.kind == "CH") {
-        const toml::table* fe_tbl  = as_table_ptr(spec.tbl->operator[]("free_energy"));
-        const toml::table* mob_tbl = as_table_ptr(spec.tbl->operator[]("mobility"));
+    if(spec.kind == "CH") {
+        const toml::table *fe_tbl  = as_table_ptr(spec.tbl->operator[]("free_energy"));
+        const toml::table *mob_tbl = as_table_ptr(spec.tbl->operator[]("mobility"));
         if(!fe_tbl) {
             throw std::runtime_error(spec.id + ": [free_energy] missing");
         }
 
         double k = *value_or_die<double>(spec.tbl, "kappa");
 
-        auto fe_any  = parse_ch_fe_any(*fe_tbl);
+        auto fe_any = parse_ch_fe_any(*fe_tbl);
         auto mob_any = parse_mob_any<D>(mob_tbl);
 
         return std::visit(
@@ -189,6 +251,29 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
                 return std::make_unique<CHTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, spec.target, fe, mob, k);
             },
             fe_any, mob_any
+        );
+    }
+    else if (spec.kind == "CH_multi") {
+        const toml::table *fe_tbl  = as_table_ptr(spec.tbl->operator[]("free_energy"));
+        const toml::table *mob_tbl = as_table_ptr(spec.tbl->operator[]("mobility"));
+        if(!fe_tbl) {
+            throw std::runtime_error(spec.id + ": [free_energy] missing");
+        }
+
+        auto fe_any = parse_ch_multi_fe_any(*fe_tbl);
+        auto mob_any = parse_multi_mob_any<D>(mob_tbl);
+
+        return std::visit(
+        [&](auto&& fe, auto&& mob) -> std::unique_ptr<ITerm<D>> {
+            using FE  = std::decay_t<decltype(fe)>;
+            using MOB = std::decay_t<decltype(mob)>;
+            auto fd = dynamic_cast<const FDOps<D>*>(&ops);
+            if(!fd) {
+                throw std::runtime_error("CH_multi requires FDOps backend");
+            }
+            return std::make_unique<CHMultiTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, spec.target_multi, fe, mob);
+        },
+        fe_any, mob_any
         );
     }
     else if(spec.kind == "AC") {

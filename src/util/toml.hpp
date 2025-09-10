@@ -76,4 +76,39 @@ T value_or(const toml::table* tp, std::string_view key_path, T default_value) {
     return value_or<T>(*tp, key_path, default_value);
 }
 
+template<typename T>
+std::vector<T> vector_or(const toml::array* a, const std::vector<T>& def){
+    if(!a) {
+        return def;
+    }
+    std::vector<T> out;
+    out.reserve(a->size());
+    for(auto& n : *a) {
+        if(auto v = n.template value<T>()) {
+            out.push_back(*v);
+        }
+    }
+    return out.empty() ? def : out;
+}
+
+template<typename T>
+std::vector<std::vector<T>> matrix_or(const toml::array* a, const std::vector<std::vector<T>>& def){
+    if(!a) {
+        return def;
+    }
+    std::vector<std::vector<T>> M;
+    M.reserve(a->size());
+    for(auto& row : *a){
+        if (auto ra = row.as_array()){
+            std::vector<T> r;
+            r.reserve(ra->size());
+            for (auto& c : *ra) if (auto x = c.template value<T>()) r.push_back(*x);
+            if(!r.empty()) {
+                M.emplace_back(std::move(r));
+            }
+        }
+    }
+    return M.empty() ? def : M;
+}
+
 }  // namespace circa
