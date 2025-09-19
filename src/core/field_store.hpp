@@ -41,7 +41,9 @@ struct FieldStore {
 
 template <int D>
 inline void axpy(Field<D>& y, const Field<D>& x, double a) {
-    for(int i = 0; i < y.g.size; ++i) y.a[i] += a * x.a[i];
+    for(int i = 0; i < y.g.size; ++i) {
+        y.a[i] += a * x.a[i];
+    }
 }
 
 template <int D>

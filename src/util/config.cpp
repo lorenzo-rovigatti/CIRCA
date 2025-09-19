@@ -79,7 +79,7 @@ using FE_CH_Multi_Any = std::variant<
     FE_CH_MultiQuad
 >;
 
-inline FE_CH_Multi_Any parse_ch_multi_fe_any(const toml::table& fe_tbl){
+FE_CH_Multi_Any parse_ch_multi_fe_any(const toml::table& fe_tbl){
     const auto type = fe_tbl["type"].template value<std::string>().value_or("");
 
     if(type == "multi_quad"){
@@ -89,7 +89,7 @@ inline FE_CH_Multi_Any parse_ch_multi_fe_any(const toml::table& fe_tbl){
         fe.kappa = vector_or<double>(fe_tbl["kappa"].as_array(), {});
         fe.chi = matrix_or<double>(fe_tbl["chi"].as_array(), {});
         if(fe.a.empty() || fe.b.empty() || fe.kappa.empty() || fe.chi.empty()) {
-            throw std::runtime_error("[free_energy] multi_quad expects a, b, kappa, chi arrays");
+            throw std::runtime_error("[free_energy] multi_quad expects a, b, kappa, and chi arrays");
         }
         return fe;
     }
@@ -103,7 +103,7 @@ using MobMultiAny = std::variant<
 >;
 
 template<int D>
-inline MobMultiAny<D> parse_multi_mob_any(const toml::table* mob_tbl){
+MobMultiAny<D> parse_multi_mob_any(const toml::table* mob_tbl){
     const std::string type = value_or<std::string>(mob_tbl, "type", "diag_const");
     if(type == "diag_const"){
         MobilityDiagConst<D> m;
@@ -128,6 +128,7 @@ template <int D>
 struct TermSpec {
     std::string id;
     std::string kind;        // "CH" | "AC" | ...
+    // TODO these two could be merged into one variant or something like that 
     std::string target;      // field to update
     std::vector<std::string> target_multi; // for multi-field terms
     std::string ops_type;    // "fd" | "spectral" | ...
@@ -135,7 +136,7 @@ struct TermSpec {
 };
 
 template <int D>
-inline std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
+std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
     std::vector<TermSpec<D>> specs;
     auto terms = root["terms"].as_array();
     if(!terms) {
@@ -182,9 +183,9 @@ inline std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
     return specs;
 }
 
-// Concrete "ops" resolver (FD for now; extend later)
+// Concrete "ops" resolve
 template <int D>
-inline const DerivOps<D>& resolve_ops(const std::string& ops_type, const toml::table* /*ops_tbl*/) {
+const DerivOps<D>& resolve_ops(const std::string& ops_type, const toml::table* /*ops_tbl*/) {
     if(ops_type == "fd") {
         static FDOps<D> fd;
         return fd;
@@ -196,7 +197,7 @@ inline const DerivOps<D>& resolve_ops(const std::string& ops_type, const toml::t
 
 // CH term factory for specific FE & MOB types
 template <int D, class FE, class MOB>
-inline std::unique_ptr<ITerm<D>> make_CH_term(FieldStore<D>& S, FieldStore<D>& dS,
+std::unique_ptr<ITerm<D>> make_CH_term(FieldStore<D>& S, FieldStore<D>& dS,
                                               const DerivOps<D>& ops_any,
                                               const std::string& target,
                                               const FE& fe, const MOB& mob, double k) {
@@ -209,7 +210,7 @@ inline std::unique_ptr<ITerm<D>> make_CH_term(FieldStore<D>& S, FieldStore<D>& d
 
 // AC term factory for specific FE type
 template <int D, class FE>
-inline std::unique_ptr<ITerm<D>> make_AC_term(FieldStore<D>& S, FieldStore<D>& dS,
+std::unique_ptr<ITerm<D>> make_AC_term(FieldStore<D>& S, FieldStore<D>& dS,
                                               const DerivOps<D>& ops_any,
                                               const std::string& target,
                                               const std::string& driver,
@@ -223,7 +224,7 @@ inline std::unique_ptr<ITerm<D>> make_AC_term(FieldStore<D>& S, FieldStore<D>& d
 
 // Build one term instance from a TermSpec + its TOML subtree
 template <int D>
-inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>& dS, const TermSpec<D>& spec) {
+std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>& dS, const TermSpec<D>& spec) {
     // Resolve ops
     const toml::table *ops_tbl = as_table_ptr(spec.tbl->operator[]("ops"));
     const DerivOps<D>& ops = resolve_ops<D>(spec.ops_type, ops_tbl);
@@ -260,6 +261,8 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
             throw std::runtime_error(spec.id + ": [free_energy] missing");
         }
 
+        double k = *value_or_die<double>(spec.tbl, "kappa");
+
         auto fe_any = parse_ch_multi_fe_any(*fe_tbl);
         auto mob_any = parse_multi_mob_any<D>(mob_tbl);
 
@@ -271,7 +274,7 @@ inline std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>&
             if(!fd) {
                 throw std::runtime_error("CH_multi requires FDOps backend");
             }
-            return std::make_unique<CHMultiTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, spec.target_multi, fe, mob);
+            return std::make_unique<CHMultiTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, spec.target_multi, fe, mob, k);
         },
         fe_any, mob_any
         );

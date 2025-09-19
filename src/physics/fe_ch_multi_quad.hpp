@@ -12,30 +12,37 @@ struct FE_CH_MultiQuad {
     std::vector<std::vector<double>> chi;  // NxN symmetric
 
     template <int D>
-    std::vector<Field<D>> mu(const FieldStore<D>& /*S*/,
-                                     const std::vector<const Field<D>*>& phi,
-                                     const std::vector<Field<D>>& lap_phi) const {
+    std::vector<Field<D>> mu(const std::vector<const Field<D>*>& phi) const {
         const int N = (int)phi.size();
+
         assert((int)a.size() == N && (int)b.size() == N && (int)kappa.size() == N && (int)chi.size() == N);
-        for (int i = 0; i < N; ++i) assert((int)chi[i].size() == N);
+        for(int i = 0; i < N; ++i) {
+            assert((int)chi[i].size() == N);
+        }
 
         std::vector<Field<D>> mu_values;
         mu_values.reserve(N);
-        for (int i = 0; i < N; ++i) mu_values.emplace_back(phi[i]->g);
+        for(int i = 0; i < N; i++) {
+            mu_values.emplace_back(phi[i]->g);
+        }
 
         const int size = phi[0]->g.size;
-        for (int p = 0; p < size; ++p) {
+        for(int p = 0; p < size; p++) {
             // cache φ_j(p)
             std::vector<double> ph(N);
-            for (int j = 0; j < N; ++j) ph[j] = phi[j]->a[p];
+            for(int j = 0; j < N; j++) {
+                ph[j] = phi[j]->a[p];
+            }
 
-            for (int i = 0; i < N; ++i) {
+            for(int i = 0; i < N; i++) {
                 double bulk = a[i] * ph[i] + b[i] * ph[i] * ph[i] * ph[i];  // a_i φ_i + b_i φ_i^3
                 double coup = 0.0;
-                for (int j = 0; j < N; ++j)
-                    if (j != i) coup += chi[i][j] * ph[j];
-                double grad = -kappa[i] * lap_phi[i].a[p];
-                mu_values[i].a[p] = bulk + coup + grad;
+                for (int j = 0; j < N; j++) {
+                    if (j != i) {
+                        coup += chi[i][j] * ph[j];
+                    }
+                }
+                mu_values[i].a[p] = bulk + coup;
             }
         }
         return mu_values;

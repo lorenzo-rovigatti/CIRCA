@@ -33,10 +33,12 @@ struct CHMultiTerm : ITerm<D> {
     std::vector<std::string> target;  // names of the N species
     FE fe;
     MOB mob;
+    // TODO: make kappa a vector, one value per species
+    double kappa;
 
     CHMultiTerm(FieldStore<D>& S0, FieldStore<D>& dS0, const Ops& ops_,
-                std::vector<std::string> targets, FE fe_, MOB mob_)
-        : S(&S0), dSdt(&dS0), ops(ops_), target(std::move(targets)), fe(fe_), mob(mob_) {}
+                std::vector<std::string> targets, FE fe_, MOB mob_, double k)
+        : S(&S0), dSdt(&dS0), ops(ops_), target(std::move(targets)), fe(fe_), mob(mob_), kappa(k) {}
 
     void set_state(FieldStore<D>* Sin, FieldStore<D>* dSout) override {
         S = Sin;
@@ -48,34 +50,36 @@ struct CHMultiTerm : ITerm<D> {
         // gather φ_i and ∇²φ_i
         std::vector<const Field<D>*> phi(N);
         std::vector<Field<D>> lap(N);
-        for (int a = 0; a < N; ++a) {
+        for(int a = 0; a < N; a++) {
             phi[a] = &S->get(target[a]);
             lap[a] = ops.laplacian(*phi[a]);
         }
 
         // μ_i
-        std::vector<Field<D>> mu = fe.template mu<D>(*S, phi, lap);
+        std::vector<Field<D>> mu = fe.template mu<D>(phi);
 
         // ∇μ_i
-        std::vector<std::array<Field<D>, D>> grad_mu;
-        grad_mu.resize(N);
-        for (int i = 0; i < N; ++i) {
-            for (int d = 0; d < D; ++d) grad_mu[i][d] = Field<D>(phi[i]->g);
+        std::vector<std::array<Field<D>, D>> grad_mu(N);
+        for(int i = 0; i < N; i++) {
+            for(int d = 0; d < D; d++) {
+                grad_mu[i][d] = Field<D>(phi[i]->g);
+            }
+            axpy(mu[i], lap[i], -2.0 * kappa);  // μ_i -= 2 κ ∇²φ_i
             grad_mu[i] = ops.gradient(mu[i]);
         }
 
         // For each species i: J_i = -sum_beta M_{iβ} ∇μ_β   (diagonal => only β=i)
-        for(int i = 0; i < N; ++i) {
+        for(int i = 0; i < N; i++) {
             std::array<Field<D>, D> flux;
-            for (int d = 0; d < D; d++) {
+            for(int d = 0; d < D; d++) {
                 flux[d] = Field<D>(phi[i]->g);
             }
 
             if constexpr (has_M_i<MOB, D>::value) {
                 // diagonal mobility
-                for (int p = 0; p < phi[i]->g.size; ++p) {
+                for(int p = 0; p < phi[i]->g.size; ++p) {
                     const double Mi = mob.M_i(i, p, *S);
-                    for (int d = 0; d < D; ++d)
+                    for(int d = 0; d < D; ++d)
                         flux[d].a[p] = -Mi * grad_mu[i][d].a[p];
                 }
             } 
