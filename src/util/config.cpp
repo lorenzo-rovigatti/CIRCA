@@ -41,7 +41,8 @@ FE_CH_Any parse_ch_fe_any(const toml::table& fe_tbl){
 template<int D>
 using MobAny = std::variant<
     MobConst<D>,
-    MobExpOfField<D>
+    MobExpOfField<D>,
+    MobWertheimAuto<D>
 >;
 
 template<int D>
@@ -56,9 +57,17 @@ MobAny<D> parse_mob_any(const toml::table* mob_tbl){
     if(type == "exp_of_field"){
         MobExpOfField<D> m;
         m.field = value_or<std::string>(mob_tbl, "field", "c");
-        m.c0    = value_or<double>(mob_tbl, "c0", 1.0);
+        m.c0 = value_or<double>(mob_tbl, "c0", 1.0);
         return m;
     }
+
+    if(type == "wertheim_auto"){
+        MobWertheimAuto<D> m;
+        m.field = value_or<std::string>(mob_tbl, "field", "phi");
+        m.D0 = value_or<double>(mob_tbl, "D0", 1.0);
+        return m;
+    }
+
     throw std::runtime_error("unknown mobility.type: " + type);
 }
 
@@ -249,7 +258,23 @@ std::unique_ptr<ITerm<D>> build_one_term(FieldStore<D>& S, FieldStore<D>& dS, co
                 if(!fd) {
                     throw std::runtime_error("CHTerm requires FDOps backend");
                 }
-                return std::make_unique<CHTerm<D, FE, MOB, FDOps<D>>>(S, dS, *fd, spec.target, fe, mob, k);
+
+                if constexpr (std::is_same_v<MOB, MobWertheimAuto<D>>) {
+                    if constexpr (!std::is_same_v<FE, FE_CH_Wertheim>) {
+                        throw std::runtime_error("mobility.type=wertheim_coupled requires free_energy.type=wertheim");
+                    } 
+                    else {
+                        MobWertheimBound<D, FE> bound{mob, &fe};
+                        return std::make_unique<CHTerm<D, FE, MobWertheimBound<D, FE>, FDOps<D>>>(
+                            S, dS, *fd, spec.target, fe, bound, k
+                        );
+                    }
+                } 
+                else {
+                    return std::make_unique<CHTerm<D, FE, MOB, FDOps<D>>>(
+                        S, dS, *fd, spec.target, fe, mob, k
+                    );
+                }
             },
             fe_any, mob_any
         );

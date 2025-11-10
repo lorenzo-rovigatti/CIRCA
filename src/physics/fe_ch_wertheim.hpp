@@ -32,6 +32,15 @@ struct FE_CH_Wertheim {
         
         return der_f_ref + der_f_bond;
     }
+
+    inline double dmu_drho(double rho) const {
+        double my_X = X(rho);
+        double dX_drho = (my_X * (my_X - 1.0)) / ((2.0 - my_X) * rho);
+        double d2f_ref = 1.0 / rho + 2.0 * B2;
+        double d2f_bond = (rho > 0.) ? valence * dX_drho / X(rho) : 0.0;
+
+        return d2f_ref + d2f_bond;
+    }
 };
 
 }  // namespace circa
