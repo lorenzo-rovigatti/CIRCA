@@ -1,0 +1,45 @@
+[grid]
+n = 128
+L = 12.8
+
+[time]
+dt = 0.000001
+steps = 1000
+
+[output]
+append_output   = false        # optional, this is the default
+output_filename = "energy.dat" # optional, this is the default
+output_every    = 100
+conf_every      = 1000
+mass_fields = "rho"
+
+[integrator]
+name       = "euler"
+
+[[fields]]
+name = "rho"
+initialisation = "random"
+average = 0.1
+random_stddev = 0.01
+
+# ===== Terms =====
+[[terms]]
+id      = "ch_rho"
+kind    = "CH"                # term type (registered key)
+target  = "rho"               # which field it updates
+enabled = true
+kappa = 1
+
+  [terms.ops]                 # which discretization backend this term uses
+  type = "fd"                 # "fd" | "spectral" (not implemented yet)
+
+  [terms.free_energy]
+  type = "wertheim"
+  B2 = 10
+  delta = 20000
+  valence = 4
+
+  [terms.mobility]
+  type = "wertheim"
+  field = "rho"
+  
