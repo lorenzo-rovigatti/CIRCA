@@ -19,8 +19,7 @@ struct FE_CH_Wertheim {
     }
 
     inline double bulk(double rho) const {
-        double f_ref = rho * std::log(rho);
-        f_ref += -rho + B2 * rho * rho;
+        double f_ref = rho * std::log(rho) - rho + B2 * rho * rho;
         double f_bond = (rho > 0.) ? valence * rho * (std::log(X(rho)) + 0.5 * (1. - X(rho))) : 0.0;
 
         return f_ref + f_bond;
@@ -37,7 +36,7 @@ struct FE_CH_Wertheim {
         double my_X = X(rho);
         double dX_drho = (my_X * (my_X - 1.0)) / ((2.0 - my_X) * rho);
         double d2f_ref = 1.0 / rho + 2.0 * B2;
-        double d2f_bond = (rho > 0.) ? valence * dX_drho / X(rho) : 0.0;
+        double d2f_bond = (rho > 0.) ? valence * dX_drho / my_X : 0.0;
 
         return d2f_ref + d2f_bond;
     }

@@ -1,6 +1,7 @@
 #pragma once
 #include "../core/system.hpp"
 #include "../ops/deriv_ops.hpp"
+#include "../util/math.hpp"
 
 namespace circa {
 
@@ -60,6 +61,11 @@ struct CHTerm : ITerm<D>, IEnergy<D> {
                 grad2 += gu[d].a[i] * gu[d].a[i];
             }
             double e_bulk = fe.bulk(u.a[i]);
+
+            if(util::safe_isnan(e_bulk)) {
+                throw std::runtime_error("nan detected in free energy density computation");
+            }
+
             double e_interfacial = kappa * grad2;
             E += (e_bulk + e_interfacial) * u.g.dV;
         }

@@ -61,7 +61,7 @@ MobAny<D> parse_mob_any(const toml::table* mob_tbl){
         return m;
     }
 
-    if(type == "wertheim_auto"){
+    if(type == "wertheim"){
         MobWertheimAuto<D> m;
         m.field = value_or<std::string>(mob_tbl, "field", "phi");
         m.D0 = value_or<double>(mob_tbl, "D0", 1.0);
@@ -165,7 +165,7 @@ std::vector<TermSpec<D>> parse_term_specs(const toml::table& root) {
         TermSpec<D> s;
         s.id = t->operator[]("id").template value<std::string>().value_or(std::string{});
         s.kind = t->operator[]("kind").template value<std::string>().value_or(std::string{});
-        if(s.kind == "CH") {
+        if(s.kind == "CH" || s.kind == "AC") {
             s.target = t->operator[]("target").template value<std::string>().value_or(std::string{});
         }
         if(s.kind == "CH_multi") {
